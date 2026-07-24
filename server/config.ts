@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import path from 'path';
 import crypto from 'crypto';
 
-export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Encryption key for at-rest AES-256-GCM (32 bytes)
 export const SERVER_ENCRYPTION_KEY = process.env.SERVER_ENCRYPTION_KEY || crypto.createHash('sha256').update('pulse-mpc-master-audio-key-2026').digest();

@@ -11,11 +11,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    open: true,
+    host: '0.0.0.0', // Required for Docker
+    port: 5173,
+    open: false, // Don't try to open browser inside container
+    watch: {
+      usePolling: true, // Required for Docker volume changes to trigger HMR
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://backend:3000',
         changeOrigin: true,
       },
     },

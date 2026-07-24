@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "tsx server/index.ts",
+    "server": "tsx watch server/index.ts",
     "prepare-samples": "tsx server/scripts/prepareSamples.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\""
   },
