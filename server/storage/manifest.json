@@ -1,0 +1,184 @@
+{
+  "kit1-pad1-59f30c7d": {
+    "id": "kit1-pad1-59f30c7d",
+    "kitId": "kit1",
+    "padIndex": 0,
+    "originalName": "vocal1.mp3",
+    "filename": "59f30c7d-13df-424f-b93e-a8b41184cef3.mp3"
+  },
+  "kit1-pad2-03889ff9": {
+    "id": "kit1-pad2-03889ff9",
+    "kitId": "kit1",
+    "padIndex": 1,
+    "originalName": "vocal2.mp3",
+    "filename": "03889ff9-9828-4c97-b8f4-6b461d0210ea.mp3"
+  },
+  "kit1-pad3-ebf71f27": {
+    "id": "kit1-pad3-ebf71f27",
+    "kitId": "kit1",
+    "padIndex": 2,
+    "originalName": "vocal3.mp3",
+    "filename": "ebf71f27-e00d-4c5b-b712-faf1c36f4d2c.mp3"
+  },
+  "kit1-pad4-527c643b": {
+    "id": "kit1-pad4-527c643b",
+    "kitId": "kit1",
+    "padIndex": 3,
+    "originalName": "vocal4.mp3",
+    "filename": "527c643b-5ec7-4795-9f34-39e9274fb3e6.mp3"
+  },
+  "kit1-pad5-f929f5c6": {
+    "id": "kit1-pad5-f929f5c6",
+    "kitId": "kit1",
+    "padIndex": 4,
+    "originalName": "faaaather.mp3",
+    "filename": "f929f5c6-6038-4566-b3df-5ce845db2669.mp3"
+  },
+  "kit1-pad6-8a0abdbb": {
+    "id": "kit1-pad6-8a0abdbb",
+    "kitId": "kit1",
+    "padIndex": 5,
+    "originalName": "bad-to-us.mp3",
+    "filename": "8a0abdbb-901a-43d6-98b1-a7df45d0b586.mp3"
+  },
+  "kit1-pad7-17163473": {
+    "id": "kit1-pad7-17163473",
+    "kitId": "kit1",
+    "padIndex": 6,
+    "originalName": "see-this-coat.mp3",
+    "filename": "17163473-4451-402a-8a57-f068dd50bbc5.mp3"
+  },
+  "kit1-pad8-900e8b21": {
+    "id": "kit1-pad8-900e8b21",
+    "kitId": "kit1",
+    "padIndex": 7,
+    "originalName": "lord-fast.mp3",
+    "filename": "900e8b21-e263-40c4-a1c0-20a25e78bc9e.mp3"
+  },
+  "kit1-pad9-25dc8a1f": {
+    "id": "kit1-pad9-25dc8a1f",
+    "kitId": "kit1",
+    "padIndex": 8,
+    "originalName": "beat-loop-2.mp3",
+    "filename": "25dc8a1f-12e3-4c51-adfc-4712770ddb91.mp3"
+  },
+  "kit1-pad10-3b3a20c9": {
+    "id": "kit1-pad10-3b3a20c9",
+    "kitId": "kit1",
+    "padIndex": 9,
+    "originalName": "intro.mp3",
+    "filename": "3b3a20c9-ed7d-4d96-a3e1-1e1d051d203f.mp3"
+  },
+  "kit1-pad11-f8abef3b": {
+    "id": "kit1-pad11-f8abef3b",
+    "kitId": "kit1",
+    "padIndex": 10,
+    "originalName": "guitar.mp3",
+    "filename": "f8abef3b-6194-47e2-b0e3-c577e15b894d.mp3"
+  },
+  "kit1-pad12-ca43fca8": {
+    "id": "kit1-pad12-ca43fca8",
+    "kitId": "kit1",
+    "padIndex": 11,
+    "originalName": "lord-long.mp3",
+    "filename": "ca43fca8-c9e1-4867-9c3f-b8e6815baf46.mp3"
+  },
+  "kit1-pad13-1fa4664e": {
+    "id": "kit1-pad13-1fa4664e",
+    "kitId": "kit1",
+    "padIndex": 12,
+    "originalName": "turn-me-up.mp3",
+    "filename": "1fa4664e-d014-4297-a881-c7daa023324f.mp3"
+  },
+  "kit2-pad1-3ce84815": {
+    "id": "kit2-pad1-3ce84815",
+    "kitId": "kit2",
+    "padIndex": 0,
+    "originalName": "piano1.mp3",
+    "filename": "3ce84815-c695-4e9f-adc6-af895f820fde.mp3"
+  },
+  "kit2-pad2-37bca1a3": {
+    "id": "kit2-pad2-37bca1a3",
+    "kitId": "kit2",
+    "padIndex": 1,
+    "originalName": "piano2.mp3",
+    "filename": "37bca1a3-d19d-44b3-b06a-3d45b37556e9.mp3"
+  },
+  "kit2-pad3-075a6932": {
+    "id": "kit2-pad3-075a6932",
+    "kitId": "kit2",
+    "padIndex": 2,
+    "originalName": "piano3.mp3",
+    "filename": "075a6932-c910-4bca-8e3c-3996f8e19896.mp3"
+  },
+  "kit2-pad4-b0794510": {
+    "id": "kit2-pad4-b0794510",
+    "kitId": "kit2",
+    "padIndex": 3,
+    "originalName": "piano4.mp3",
+    "filename": "b0794510-8fe6-456a-aa6b-91eabf17aa14.mp3"
+  },
+  "kit2-pad5-d9e1c93f": {
+    "id": "kit2-pad5-d9e1c93f",
+    "kitId": "kit2",
+    "padIndex": 4,
+    "originalName": "piano5.mp3",
+    "filename": "d9e1c93f-983b-4e55-8ba0-eb2c23617ed6.mp3"
+  },
+  "kit2-pad6-24b38c37": {
+    "id": "kit2-pad6-24b38c37",
+    "kitId": "kit2",
+    "padIndex": 5,
+    "originalName": "piano6.mp3",
+    "filename": "24b38c37-0e31-45e5-ab8a-3319ba882c98.mp3"
+  },
+  "kit2-pad7-de3dc639": {
+    "id": "kit2-pad7-de3dc639",
+    "kitId": "kit2",
+    "padIndex": 6,
+    "originalName": "piano7.mp3",
+    "filename": "de3dc639-944f-4c5d-9f29-8c4c288a3aa9.mp3"
+  },
+  "kit2-pad8-d558711e": {
+    "id": "kit2-pad8-d558711e",
+    "kitId": "kit2",
+    "padIndex": 7,
+    "originalName": "piano8.mp3",
+    "filename": "d558711e-1d40-44cf-8c52-e84965af4c39.mp3"
+  },
+  "kit2-pad9-8018db44": {
+    "id": "kit2-pad9-8018db44",
+    "kitId": "kit2",
+    "padIndex": 8,
+    "originalName": "LookAtCha.mp3",
+    "filename": "8018db44-3b61-4d9f-9e0f-a1178467171c.mp3"
+  },
+  "kit2-pad10-3813271d": {
+    "id": "kit2-pad10-3813271d",
+    "kitId": "kit2",
+    "padIndex": 9,
+    "originalName": "LadiesNGentlemen.mp3",
+    "filename": "3813271d-cb7a-44df-aad3-27aaa583bfac.mp3"
+  },
+  "kit2-pad11-e2908e4f": {
+    "id": "kit2-pad11-e2908e4f",
+    "kitId": "kit2",
+    "padIndex": 10,
+    "originalName": "Hey.mp3",
+    "filename": "e2908e4f-70c7-450f-9e65-dafb354959f7.mp3"
+  },
+  "kit2-pad12-1acf53c1": {
+    "id": "kit2-pad12-1acf53c1",
+    "kitId": "kit2",
+    "padIndex": 11,
+    "originalName": "BeautifulStars.mp3",
+    "filename": "1acf53c1-c059-4ad2-bf87-316d4f890cb2.mp3"
+  },
+  "kit2-pad13-f6fd50ac": {
+    "id": "kit2-pad13-f6fd50ac",
+    "kitId": "kit2",
+    "padIndex": 12,
+    "originalName": "Instrumental-loop.mp3",
+    "filename": "f6fd50ac-5f4c-44e0-a0d0-1a254c4846cc.mp3"
+  }
+}
