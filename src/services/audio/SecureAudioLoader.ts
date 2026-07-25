@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * Secure Audio Loader Client Service for Pulse MPC
  *
