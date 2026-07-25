@@ -11,11 +11,12 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0', // Required for Docker
+    host: '0.0.0.0',
     port: 5173,
-    open: false, // Don't try to open browser inside container
+    open: false,
+    allowedHosts: true, // <-- Add this line
     watch: {
-      usePolling: true, // Required for Docker volume changes to trigger HMR
+      usePolling: true,
     },
     proxy: {
       '/api': {
