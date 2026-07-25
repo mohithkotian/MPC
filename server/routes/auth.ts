@@ -61,10 +61,11 @@ authRouter.post('/login', (req: Request, res: Response) => {
   // Long-lived Refresh Token (7 days)
   const refreshToken = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
 
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie('pulse_refresh', refreshToken, {
     httpOnly: true,
-    secure: true,          // Must be true when sameSite is 'none'
-    sameSite: 'none',      // Required for cross-origin cookie (frontend ≠ backend domain)
+    secure: isProd,                          // HTTPS only in production
+    sameSite: isProd ? 'none' : 'lax',       // 'none' for cross-origin in prod; 'lax' for localhost
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 

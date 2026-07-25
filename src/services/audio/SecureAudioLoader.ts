@@ -5,7 +5,7 @@
  * and automatically refreshes tokens via HttpOnly refresh cookie.
  */
 
-const API_BASE = "https://mpc-backend-latest.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "https://mpc-backend-latest.onrender.com";
 
 export class SecureAudioLoaderService {
   private accessToken: string | null = null;
@@ -57,10 +57,9 @@ export class SecureAudioLoaderService {
 
         return data.accessToken;
       })
-      .catch((err) => {
+      .finally(() => {
         this.isRefreshing = false;
-        this.accessToken = null;
-        throw err;
+        this.refreshPromise = null;  // Clear so next call starts fresh
       });
 
     return this.refreshPromise;
