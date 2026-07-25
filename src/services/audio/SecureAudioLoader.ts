@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 /**
- * Secure Audio Loader Client Service for Pulse MPC
+ * Secure Audio Loader Client Service for MPC
  *
  * Auth flow:
  *  1. Check sessionStorage for a cached access token

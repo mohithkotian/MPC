@@ -24,9 +24,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/audio', audioRouter);
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'Pulse MPC Secure Audio Delivery' });
+  res.json({ status: 'ok', service: 'MPC Secure Audio Delivery' });
 });
 
 app.listen(PORT, () => {
-  console.log(`[Pulse MPC Secure Audio Server] Listening on http://localhost:${PORT}`);
+  console.log(`[MPC Secure Audio Server] Listening on http://localhost:${PORT}`);
 });

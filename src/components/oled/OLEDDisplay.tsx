@@ -76,7 +76,7 @@ export const OLEDDisplay: React.FC = () => {
             {projectName}
           </h1>
           <p className="text-[10px] font-semibold tracking-[0.1em] text-oled-red/70 mt-0.5 uppercase">
-            {projectArtist || 'PULSE MPC ENGINE'}
+            {projectArtist || 'MPC ENGINE'}
           </p>
         </div>
         <div className="text-right">
