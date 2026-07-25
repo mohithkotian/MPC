@@ -63,9 +63,9 @@ authRouter.post('/login', (req: Request, res: Response) => {
 
   res.cookie('pulse_refresh', refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 3600 * 1000,
+    secure: true,          // Must be true when sameSite is 'none'
+    sameSite: 'none',      // Required for cross-origin cookie (frontend ≠ backend domain)
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   res.json({
