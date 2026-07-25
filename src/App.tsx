@@ -15,6 +15,7 @@ export const App: React.FC = () => {
     loadPresetKit('kit1');
   }, [loadPresetKit]);
 
+  
   return (
     <Chassis>
       {viewMode === 'MAIN' && <MainView />}
