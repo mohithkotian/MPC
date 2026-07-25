@@ -251,11 +251,31 @@ docker run -p 8080:8080 mpc-frontend
 
 ---
 
-License
-<p> <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code license" /> <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork notice" /> <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio notice" /> </p>
-Component	Status
-Source code	Copyright mohithkotian. Provided for personal and educational use.
-Album artwork	Property of the original artist and label. Displayed in the Dedication section for non-commercial, fan-tribute purposes only. No ownership claimed.
-Audio tracks	Not included, bundled, or redistributed in this repository in any format. This codebase never has, and never will, ship copies of the underlying songs. Deploy your own legally obtained audio files.
 
-Author and maintainer: @mohithkotian
+## 📝 License
+
+<p>
+  <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code license" />
+  <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork notice" />
+  <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio notice" />
+</p>
+
+| Component | Status |
+|-----------|--------|
+| **Source Code** | Copyright © 2026 **mohithkotian**. Provided for personal and educational use. |
+| **Album Artwork** | Property of the original artists and labels. Displayed only as a non-commercial fan tribute. No ownership claimed. |
+| **Audio Tracks** | Not included, bundled, or redistributed in this repository. Users must provide their own legally obtained audio files. |
+
+---
+
+<div align="center">
+
+### 🎵 Built with passion for music, engineering, and learning.
+
+**Author & Maintainer**
+
+**[@mohithkotian](https://github.com/mohithkotian)**
+
+*This project is intended for educational purposes and showcases software engineering techniques. It is not affiliated with or endorsed by any artist, record label, or music service.*
+
+</div>
