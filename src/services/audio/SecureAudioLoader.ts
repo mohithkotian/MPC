@@ -1,68 +1,75 @@
 /**
  * Secure Audio Loader Client Service for Pulse MPC
  *
- * Fetches audio streams securely using Short-Lived Access Tokens (Bearer)
- * and automatically refreshes tokens via HttpOnly refresh cookie.
+ * Auth flow:
+ *  1. Check sessionStorage for a cached access token
+ *  2. If none → call /login directly (avoids pointless /refresh 401 on first visit)
+ *  3. When token expires (401 on audio endpoint) → try /refresh (cookie), then /login
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "https://mpc-backend-latest.onrender.com";
 
+const TOKEN_KEY = "mpc_access_token";
+
 export class SecureAudioLoaderService {
-  private accessToken: string | null = null;
-  private isRefreshing = false;
-  private refreshPromise: Promise<string> | null = null;
+  private accessToken: string | null = sessionStorage.getItem(TOKEN_KEY);
+  private authPromise: Promise<string> | null = null;
 
   /**
-   * Refreshes the short-lived access token using the HttpOnly refresh cookie
+   * Obtain a valid access token.
+   * Tries /refresh (uses HttpOnly cookie if present), falls back to /login.
+   * Deduplicates concurrent calls so only one auth round-trip happens at a time.
    */
-  private async refreshAccessToken(): Promise<string> {
-    if (this.isRefreshing && this.refreshPromise) {
-      return this.refreshPromise;
+  private getToken(): Promise<string> {
+    if (this.authPromise) return this.authPromise;
+
+    this.authPromise = this._fetchToken().finally(() => {
+      this.authPromise = null;
+    });
+
+    return this.authPromise;
+  }
+
+  private async _fetchToken(): Promise<string> {
+    // Try refresh first (works after first login, when the HttpOnly cookie exists)
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this._storeToken(data.accessToken);
+        return data.accessToken;
+      }
+    } catch {
+      // Network error on refresh — fall through to login
     }
 
-    this.isRefreshing = true;
-
-    this.refreshPromise = fetch(`${API_BASE}/api/auth/refresh`, {
+    // Refresh failed (no cookie yet, or expired) → auto-login
+    const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       credentials: "include",
-    })
-      .then(async (res) => {
-        if (res.status === 401) {
-          const loginRes = await fetch(`${API_BASE}/api/auth/login`, {
-            method: "POST",
-            credentials: "include",
-          });
+      headers: { "Content-Type": "application/json" },
+    });
 
-          if (!loginRes.ok) {
-            throw new Error("Failed to auto-login. Please refresh the page.");
-          }
+    if (!loginRes.ok) {
+      throw new Error(`Auto-login failed: HTTP ${loginRes.status}`);
+    }
 
-          const loginData = await loginRes.json();
+    const loginData = await loginRes.json();
+    this._storeToken(loginData.accessToken);
+    return loginData.accessToken;
+  }
 
-          this.isRefreshing = false;
-          this.accessToken = loginData.accessToken;
+  private _storeToken(token: string): void {
+    this.accessToken = token;
+    sessionStorage.setItem(TOKEN_KEY, token);
+  }
 
-          return loginData.accessToken;
-        }
-
-        this.isRefreshing = false;
-
-        if (!res.ok) {
-          throw new Error("Session expired. Please log in again.");
-        }
-
-        const data = await res.json();
-
-        this.accessToken = data.accessToken;
-
-        return data.accessToken;
-      })
-      .finally(() => {
-        this.isRefreshing = false;
-        this.refreshPromise = null;  // Clear so next call starts fresh
-      });
-
-    return this.refreshPromise;
+  private _clearToken(): void {
+    this.accessToken = null;
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 
   /**
@@ -74,7 +81,7 @@ export class SecureAudioLoaderService {
     isRetry = false
   ): Promise<ArrayBuffer> {
     if (!this.accessToken) {
-      await this.refreshAccessToken();
+      this.accessToken = await this.getToken();
     }
 
     const response = await fetch(
@@ -90,7 +97,9 @@ export class SecureAudioLoaderService {
 
     if (!response.ok) {
       if (response.status === 401 && !isRetry) {
-        await this.refreshAccessToken();
+        // Token expired — clear it and re-auth once
+        this._clearToken();
+        this.accessToken = await this.getToken();
         return this.fetchAndDecryptSample(sampleId, true);
       }
 
