@@ -251,12 +251,11 @@ docker run -p 8080:8080 mpc-frontend
 
 ---
 
-## License
+License
+<p> <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code license" /> <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork notice" /> <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio notice" /> </p>
+Component	Status
+Source code	Copyright mohithkotian. Provided for personal and educational use.
+Album artwork	Property of the original artist and label. Displayed in the Dedication section for non-commercial, fan-tribute purposes only. No ownership claimed.
+Audio tracks	Not included, bundled, or redistributed in this repository in any format. This codebase never has, and never will, ship copies of the underlying songs. Deploy your own legally obtained audio files.
 
-The application source code in this repository is copyright mohithkotian and is provided for personal and educational use.
-
-Album artwork displayed in the Dedication section remains the property of its respective rights holders (the original artist and label) and is used here for non-commercial, fan-tribute purposes only. No ownership of this artwork is claimed.
-
-Audio tracks referenced by this project are not included, bundled, or redistributed in this repository in any format. This codebase does not contain, and has never contained, copies of the underlying songs. Users of this project must supply their own legally obtained audio files.
-
-License: https://github.com/mohithkotian
+Author and maintainer: @mohithkotian
