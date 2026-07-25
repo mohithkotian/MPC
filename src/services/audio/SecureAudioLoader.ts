@@ -7,7 +7,10 @@
  *  3. When token expires (401 on audio endpoint) → try /refresh (cookie), then /login
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "https://mpc-backend-latest.onrender.com";
+// In production: nginx proxies /api/* → backend (same-origin, no CORS needed)
+// In local dev: Vite proxies /api/* → backend (via vite.config.ts server.proxy)
+// VITE_API_BASE can override for non-proxied setups (leave empty for proxy mode)
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const TOKEN_KEY = "mpc_access_token";
 
