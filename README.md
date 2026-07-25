@@ -255,27 +255,27 @@ docker run -p 8080:8080 mpc-frontend
 ## 📝 License
 
 <p>
-  <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code license" />
-  <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork notice" />
-  <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio notice" />
+  <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code License" />
+  <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork Notice" />
+  <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio Notice" />
 </p>
 
 | Component | Status |
 |-----------|--------|
-| **Source Code** | Copyright © 2026 **mohithkotian**. Provided for personal and educational use. |
-| **Album Artwork** | Property of the original artists and labels. Displayed only as a non-commercial fan tribute. No ownership claimed. |
-| **Audio Tracks** | Not included, bundled, or redistributed in this repository. Users must provide their own legally obtained audio files. |
+| **Source Code** | Copyright © 2026. Provided for personal and educational use. |
+| **Album Artwork** | Property of the respective artists and labels. Used only as a non-commercial fan tribute. No ownership claimed. |
+| **Audio Tracks** | Never included, bundled, or redistributed in this repository. Users must provide their own legally obtained audio files. |
 
 ---
 
 <div align="center">
 
-### 🎵 Built with passion for music, engineering, and learning.
+### 🎵 Built for learning, engineering, and music.
 
-**Author & Maintainer**
+[![Author](https://img.shields.io/badge/AUTHOR-MOHITHKOTIAN-2196F3?style=for-the-badge&logo=github&logoColor=white&labelColor=2D2D2D)](https://github.com/mohithkotian)
 
-**[@mohithkotian](https://github.com/mohithkotian)**
+*This repository contains application source code only. It does not include, distribute, or expose copyrighted audio or other protected media. Users are responsible for supplying audio they are legally authorized to use.*
 
-*This project is intended for educational purposes and showcases software engineering techniques. It is not affiliated with or endorsed by any artist, record label, or music service.*
+</div>
 
 </div>
