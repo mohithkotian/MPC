@@ -4,21 +4,20 @@ A browser-based Music Production Center built with React, TypeScript, and the We
 
 Author: [mohithkotian][def]
 
-> **Note on audio assets.** This repository ships the application code only. The audio samples referenced throughout this document and the interface (including the Father Stretch My Hands and Runaway pad banks) are **not included, bundled, or distributed** in this repository in any format, including `.mp3`, `.wav`, or `.mp4`. Anyone deploying this project is responsible for supplying their own licensed audio samples in `server/storage/samples/`. No copyrighted audio is redistributed as part of this codebase.
+> **Note on audio assets.** This repository ships the application code only. The audio samples referenced throughout this document and the interface (including the Father and Runaway pad banks) are **not included, bundled, or distributed** in this repository in any format, including `.mp3`, `.wav`, or `.mp4`. Anyone deploying this project is responsible for supplying their own licensed audio samples in `server/storage/samples/`. No copyrighted audio is redistributed as part of this codebase.
 
 ---
-
 ## Dedication
 
-This project is dedicated to Ye's catalog, and specifically built around two tracks that shaped its identity: **Father Stretch My Hands** and **Runaway**, the latter drawn from *My Beautiful Dark Twisted Fantasy*.
+This project is dedicated to Ye's catalog, and specifically built around two tracks that shaped its identity: **Father**, from *Bully*, and **Runaway**, from *My Beautiful Dark Twisted Fantasy*.
 
 <p align="center">
-  <img src="src/pic/2f580162623495bd9a45d817ef6939b9.jpg" width="360" alt="Father Stretch My Hands" />
+  <img src="src/pic/2f580162623495bd9a45d817ef6939b9.jpg" width="360" alt="Father - Bully" />
   &nbsp;&nbsp;&nbsp;
   <img src="src/pic/e24a522013dcf3918f27d1d2d7f0b22b.jpg" width="360" alt="My Beautiful Dark Twisted Fantasy - Runaway" />
 </p>
 
-These two tracks are the default pad bank loaded on launch, and the visual identity of the interface (typography, red accenting, distressed texture) is intentionally styled after this era of work.
+These two tracks are the default pad bank loaded on launch, and the visual identity of the interface (typography, red accenting, distressed texture) is intentionally styled after both eras of work.
 
 ---
 
