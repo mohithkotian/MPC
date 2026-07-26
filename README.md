@@ -251,12 +251,31 @@ docker run -p 8080:8080 mpc-frontend
 
 ---
 
-## License
 
-The application source code in this repository is copyright mohithkotian and is provided for personal and educational use.
+## 📝 License
 
-Album artwork displayed in the Dedication section remains the property of its respective rights holders (the original artist and label) and is used here for non-commercial, fan-tribute purposes only. No ownership of this artwork is claimed.
+<p>
+  <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code License" />
+  <img src="https://img.shields.io/badge/artwork-third--party%2C%20fan--tribute-red" alt="Artwork Notice" />
+  <img src="https://img.shields.io/badge/audio-not%20distributed-black" alt="Audio Notice" />
+</p>
 
-Audio tracks referenced by this project are not included, bundled, or redistributed in this repository in any format. This codebase does not contain, and has never contained, copies of the underlying songs. Users of this project must supply their own legally obtained audio files.
+| Component | Status |
+|-----------|--------|
+| **Source Code** | Copyright © 2026. Provided for personal and educational use. |
+| **Album Artwork** | Property of the respective artists and labels. Used only as a non-commercial fan tribute. No ownership claimed. |
+| **Audio Tracks** | Never included, bundled, or redistributed in this repository. Users must provide their own legally obtained audio files. |
 
-License: https://github.com/mohithkotian
+---
+
+<div align="center">
+
+### 🎵 Built for learning, engineering, and music.
+
+[![Author](https://img.shields.io/badge/AUTHOR-MOHITHKOTIAN-2196F3?style=for-the-badge&logo=github&logoColor=white&labelColor=2D2D2D)](https://github.com/mohithkotian)
+
+*This repository contains application source code only. It does not include, distribute, or expose copyrighted audio or other protected media. Users are responsible for supplying audio they are legally authorized to use.*
+
+</div>
+
+</div>
