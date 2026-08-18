@@ -59,7 +59,7 @@ export const MainView: React.FC = () => {
         <div className="w-full flex items-center justify-between border-b border-[#1e2028] pb-2">
           <PadBanks />
           <div className="text-right font-mono text-xs font-black text-orange-500 uppercase tracking-widest drop-shadow">
-            MCP
+            MPC
           </div>
         </div>
         <PadGrid />

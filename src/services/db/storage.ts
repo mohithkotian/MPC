@@ -17,7 +17,7 @@ interface MPCAppDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'mcp_db';
+const DB_NAME = 'mpc_db';
 const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<MPCAppDB>> | null = null;

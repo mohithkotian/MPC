@@ -4,7 +4,7 @@ import { audioEngine } from '../services/audio/AudioEngine';
 import { createEmptyBank, PRESET_KITS } from '../services/audio/presetKits';
 import { saveProjectToDB, saveSampleBlobToDB } from '../services/db/storage';
 
-interface MCPState {
+interface MPCState {
   activeBank: BankId;
   viewMode: ViewMode;
   selectedPadIndex: number;
@@ -85,7 +85,7 @@ function createEmptyPattern(bankId: BankId): BankPattern {
   };
 }
 
-export const useStore = create<MCPState>((set, get) => {
+export const useStore = create<MPCState>((set, get) => {
   let stepTimerId: number | null = null;
 
   const initialBanks: Record<BankId, PadConfig[]> = {
@@ -120,7 +120,7 @@ export const useStore = create<MCPState>((set, get) => {
     currentStep: 0,
 
     projectId: 'default-project',
-    projectName: 'MCP SESSION',
+    projectName: 'MPC SESSION',
     projectArtist: '',
     activePresetId: 'kit1',
     customKitNames: {

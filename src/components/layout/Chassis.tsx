@@ -33,7 +33,7 @@ export const Chassis: React.FC<ChassisProps> = ({ children }) => {
               <div className="absolute inset-0 w-2.5 h-6 bg-gradient-to-b from-orange-400 to-transparent rounded-sm opacity-50 blur-sm" />
             </div>
             <h1 className="text-xl font-black tracking-[0.2em] text-orange-500 uppercase drop-shadow-[0_0_8px_rgba(255,102,0,0.4)]">
-              MCP
+              MPC
             </h1>
           </div>
 
@@ -68,7 +68,7 @@ export const Chassis: React.FC<ChassisProps> = ({ children }) => {
               <div key={i} className="w-3.5 h-0.5 bg-[#0c0d11] rounded-full border border-black/60" />
             ))}
           </div>
-          <div className="tracking-wider">MCP-2026 // WEB AUDIO WORKSTATION</div>
+          <div className="tracking-wider">MPC-2026 // WEB AUDIO WORKSTATION</div>
         </div>
       </div>
     </div>
