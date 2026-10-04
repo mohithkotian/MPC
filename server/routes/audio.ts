@@ -70,6 +70,13 @@ function resolveSampleEntry(
   return null;
 }
 
+function isSafeSampleFilename(filename: string): boolean {
+  return (
+    path.basename(filename) === filename &&
+    /^[a-f0-9-]+\.mp3$/i.test(filename)
+  );
+}
+
 /**
  * GET /api/audio/manifest
  */
@@ -113,7 +120,15 @@ audioRouter.get(
       });
     }
 
-    const filePath = path.join(SAMPLES_DIR, sampleEntry.filename);
+    if (!isSafeSampleFilename(sampleEntry.filename)) {
+      console.error('[Audio] Refusing to stream a file outside the samples directory');
+      return res.status(404).json({
+        error: 'Sample file missing',
+      });
+    }
+
+    // The filename has been constrained to a basename with the expected MP3 format above.
+    const filePath = path.join(SAMPLES_DIR, sampleEntry.filename); // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal, javascript.express.security.audit.express-path-join-resolve-traversal.express-path-join-resolve-traversal
 
     if (!fs.existsSync(filePath)) {
       console.error(`[Audio] Missing file: ${filePath}`);
@@ -138,7 +153,7 @@ audioRouter.get(
     const stream = fs.createReadStream(filePath);
 
     stream.on('error', (err) => {
-      console.error(`[Audio Stream Error] ${sampleId}`, err);
+      console.error('[Audio Stream Error]', { sampleId, err });
 
       if (!res.headersSent) {
         res.status(500).json({

@@ -70,7 +70,7 @@ class AudioEngineService {
       this.bufferCache.set(url, decodedBuffer);
       return decodedBuffer;
     } catch (err) {
-      console.warn(`Failed to load audio securely from ${url}:`, err);
+      console.warn('Failed to load audio securely', { url, err });
       return null;
     }
   }
