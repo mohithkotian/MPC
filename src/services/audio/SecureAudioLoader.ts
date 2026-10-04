@@ -18,6 +18,7 @@ const TOKEN_KEY = "mpc_access_token";
 export class SecureAudioLoaderService {
   private accessToken: string | null = sessionStorage.getItem(TOKEN_KEY);
   private authPromise: Promise<string> | null = null;
+  private authRetryAt = 0;
 
   /**
    * Obtain a valid access token.
@@ -26,6 +27,15 @@ export class SecureAudioLoaderService {
    */
   private getToken(): Promise<string> {
     if (this.authPromise) return this.authPromise;
+
+    const retryAfterMs = this.authRetryAt - Date.now();
+    if (retryAfterMs > 0) {
+      return Promise.reject(
+        new Error(
+          `Authentication is temporarily rate-limited. Retry in ${Math.ceil(retryAfterMs / 1000)} seconds.`
+        )
+      );
+    }
 
     this.authPromise = this._fetchToken().finally(() => {
       this.authPromise = null;
@@ -41,6 +51,10 @@ export class SecureAudioLoaderService {
         method: "POST",
         credentials: "include",
       });
+      if (res.status === 429) {
+        this.setAuthRetryAfter(res);
+        throw new Error("Authentication refresh is temporarily rate-limited.");
+      }
       if (res.ok) {
         const data = await res.json();
         this._storeToken(data.accessToken);
@@ -58,12 +72,24 @@ export class SecureAudioLoaderService {
     });
 
     if (!loginRes.ok) {
+      if (loginRes.status === 429) {
+        this.setAuthRetryAfter(loginRes);
+      }
       throw new Error(`Auto-login failed: HTTP ${loginRes.status}`);
     }
 
     const loginData = await loginRes.json();
     this._storeToken(loginData.accessToken);
     return loginData.accessToken;
+  }
+
+  private setAuthRetryAfter(response: Response): void {
+    const retryAfterSeconds = Number(response.headers.get("Retry-After"));
+    const retryAfterMs = Number.isFinite(retryAfterSeconds)
+      ? retryAfterSeconds * 1000
+      : 30_000;
+
+    this.authRetryAt = Date.now() + Math.min(Math.max(retryAfterMs, 5_000), 15 * 60_000);
   }
 
   private _storeToken(token: string): void {
