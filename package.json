@@ -9,7 +9,12 @@
     "preview": "vite preview",
     "server": "tsx server/index.ts",
     "prepare-samples": "tsx server/scripts/prepareSamples.ts",
-    "dev:all": "concurrently \"npm run dev\" \"npm run server\""
+    "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
+    "db:migrate": "tsx server/db/migrate.ts",
+    "db:rollback": "tsx server/db/migrate.ts 0001_multi_tenant_foundation.down.sql",
+    "db:seed": "tsx server/db/seed.ts",
+    "db:test": "tsx server/db/tests/runDatabaseTests.ts",
+    "typecheck:server": "tsc -p tsconfig.server.json"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.35",
@@ -22,6 +27,7 @@
     "idb": "^8.0.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",
+    "pg": "^8.23.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.3"
@@ -32,6 +38,7 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^22.10.7",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
