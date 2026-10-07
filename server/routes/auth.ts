@@ -108,16 +108,3 @@ authRouter.post('/refresh', (req: Request, res: Response) => {
 authRouter.get('/session', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   res.json({ user: req.user });
 });
-
-/**
- * GET /api/auth/debug — Temporary: verify server env on Render
- */
-authRouter.get('/debug', (req: Request, res: Response) => {
-  res.json({
-    NODE_ENV: process.env.NODE_ENV,
-    req_secure: req.secure,
-    x_forwarded_proto: req.headers['x-forwarded-proto'],
-    isHttps: req.secure || req.headers['x-forwarded-proto'] === 'https',
-    cookies: Object.keys(req.cookies || {}),
-  });
-});
