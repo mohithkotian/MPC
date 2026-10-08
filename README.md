@@ -32,7 +32,7 @@ sequenceDiagram
     participant U  as User
     participant BR as Browser (React and TypeScript)
     participant NG as nginx Reverse Proxy
-    participant AA as Authentication API (Express and JWT)
+    participant AA as Authentication API (Express and Supabase Auth)
     participant SM as Security Middleware (Cookie, Origin, Rate Limit)
     participant SA as Secure Audio API (Express Stream)
     participant MS as Manifest Service (UUID Resolver)
@@ -40,17 +40,13 @@ sequenceDiagram
     participant WA as Web Audio API (AudioContext)
 
     rect rgb(20, 30, 48)
-        Note over U,WA: Phase 1 - Session Establishment
+        Note over U,WA: Phase 2 - Supabase Session Establishment
         U  ->>+ BR: Opens MPC
-        BR ->>+ NG: POST /api/auth/login (credentials: include)
-        NG ->>+ AA: Proxy request (same-origin from browser's view)
-        AA ->>  AA: Validate credentials<br/>Sign access token (10 min)<br/>Sign refresh token (7 days)
-        AA -->> NG: 200 OK, accessToken<br/>Set-Cookie: pulse_refresh (HttpOnly, Secure)
+        BR ->>  BR: Restore Supabase browser session
+        BR ->>+ AA: Supabase email/password sign-in or signup
+        AA -->> BR: Session and access token
         deactivate AA
-        NG -->> BR: Forward response and Set-Cookie
-        deactivate NG
-        BR ->>  BR: Store accessToken in memory / sessionStorage
-        BR -->> U: Session established
+        BR -->> U: Verified session or email-verification prompt
         deactivate BR
     end
 
@@ -62,7 +58,7 @@ sequenceDiagram
 
         rect rgb(40, 20, 20)
             Note over SM: Security Middleware enforces all of the following
-            SM ->>  SM: 1. Validate bearer token signature and expiry
+            SM ->>  SM: 1. Verify Bearer token with Supabase auth.getUser(accessToken)
             SM ->>  SM: 2. Verify Origin header against ALLOWED_ORIGINS
             SM ->>  SM: 3. Check Referer header (anti-hotlinking)
             SM ->>  SM: 4. Apply IP rate limit (express-rate-limit)
@@ -70,7 +66,7 @@ sequenceDiagram
 
         alt Unauthorized Request
             SM -->> BR: HTTP 401 Unauthorized
-            BR -->> U: Auth error, silent re-login triggered
+            BR -->> U: Auth error, session restoration or sign-in required
         else Forbidden - Hotlink or Unknown Origin
             SM -->> BR: HTTP 403 Forbidden
             BR -->> U: Access denied
@@ -111,7 +107,7 @@ sequenceDiagram
 
     rect rgb(30, 28, 20)
         Note over U,WA: Phase 5 - Token Refresh Cycle
-        BR ->>+ NG: POST /api/auth/refresh<br/>Cookie: pulse_refresh (HttpOnly, auto-sent)
+        BR ->>+ NG: Supabase client session refresh<br/>Cookie: Supabase session (HttpOnly, auto-sent)
         NG ->>+ AA: Proxy request
         AA ->>  AA: Verify refresh token signature<br/>Issue new access token (10 min)
         AA -->> NG: 200 OK, accessToken
@@ -175,8 +171,8 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 | Layer | Mechanism | Implementation |
 |-------|-----------|----------------|
 | Storage at rest | UUID obfuscation | Samples stored outside the web root using opaque UUID filenames. Real paths are never exposed. |
-| Access control | JWT bearer tokens | Short-lived access tokens (10 minutes) signed with HS256, validated on every audio request. |
-| Session persistence | HttpOnly refresh cookie | `pulse_refresh` cookie: HttpOnly, Secure, SameSite policy set per deployment topology. Seven day expiry. |
+| Access control | Supabase Bearer access tokens | Short-lived access tokens (10 minutes) signed with HS256, validated on every audio request. |
+| Session persistence | Supabase-managed browser session | `Supabase session` cookie: HttpOnly, Secure, SameSite policy set per deployment topology. Seven day expiry. |
 | Transport security | HTTPS/TLS | All streams delivered over TLS. nginx terminates SSL at the edge. |
 | Anti-hotlinking | Origin and Referer enforcement | Middleware rejects requests from domains not present in `ALLOWED_ORIGINS`. |
 | Rate limiting | IP-based throttle | `express-rate-limit`: 100 auth requests per 15 minutes per IP. |
@@ -194,7 +190,7 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 | Audio engine | Web Audio API (`AudioContext`) |
 | State management | Zustand |
 | Backend runtime | Node.js 20, Express 4 |
-| Authentication | JWT (`jsonwebtoken`), HttpOnly cookies |
+| Authentication | Supabase Auth (`@supabase/supabase-js`) and Bearer access tokens |
 | Security middleware | `helmet`, `cors`, `express-rate-limit` |
 | Production server | nginx:alpine (reverse proxy and static hosting) |
 | Containerization | Docker (multi-stage builds) |
@@ -242,7 +238,8 @@ docker run -p 8080:8080 mpc-frontend
 
 | Variable | Purpose | Required |
 |----------|---------|----------|
-| `JWT_SECRET` | Signs and verifies access and refresh tokens | Yes, in production |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Supabase Auth project and publishable key | Yes |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Browser Supabase Auth configuration | Yes |
 | `SERVER_ENCRYPTION_KEY` | 32-byte key for at-rest AES-256-GCM audio encryption | Yes, in production |
 | `ALLOWED_ORIGINS` | Comma-separated list of origins permitted to stream audio | Yes |
 | `NODE_ENV` | Set to `production` on deployment | Yes |
@@ -251,7 +248,7 @@ docker run -p 8080:8080 mpc-frontend
 ---
 
 
-## 📝 License
+## ðŸ“ License
 
 <p>
   <img src="https://img.shields.io/badge/code-personal%20%26%20educational%20use-blue" alt="Code License" />
@@ -261,7 +258,7 @@ docker run -p 8080:8080 mpc-frontend
 
 | Component | Status |
 |-----------|--------|
-| **Source Code** | Copyright © 2026. Provided for personal and educational use. |
+| **Source Code** | Copyright Â© 2026. Provided for personal and educational use. |
 | **Album Artwork** | Property of the respective artists and labels. Used only as a non-commercial fan tribute. No ownership claimed. |
 | **Audio Tracks** | Never included, bundled, or redistributed in this repository. Users must provide their own legally obtained audio files. |
 
@@ -269,7 +266,7 @@ docker run -p 8080:8080 mpc-frontend
 
 <div align="center">
 
-### 🎵 Built for learning, engineering, and music.
+### ðŸŽµ Built for learning, engineering, and music.
 
 [![Author](https://img.shields.io/badge/AUTHOR-MOHITHKOTIAN-2196F3?style=for-the-badge&logo=github&logoColor=white&labelColor=2D2D2D)](https://github.com/mohithkotian)
 

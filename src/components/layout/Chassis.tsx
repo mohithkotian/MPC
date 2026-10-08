@@ -5,9 +5,11 @@ import { Grid, Layers, Sliders, Music, Disc } from 'lucide-react';
 
 interface ChassisProps {
   children: React.ReactNode;
+  userEmail?: string;
+  onLogout?: () => void;
 }
 
-export const Chassis: React.FC<ChassisProps> = ({ children }) => {
+export const Chassis: React.FC<ChassisProps> = ({ children, userEmail, onLogout }) => {
   const { viewMode, setViewMode } = useStore();
 
   const tabs: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -37,7 +39,10 @@ export const Chassis: React.FC<ChassisProps> = ({ children }) => {
             </h1>
           </div>
 
-          <div className="flex items-center space-x-1 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]">
+          <div className="flex items-center gap-2">
+            {userEmail && <span className="hidden lg:inline text-[9px] text-gray-500 max-w-40 truncate" title={userEmail}>{userEmail}</span>}
+            {onLogout && <button type="button" onClick={onLogout} className="px-2 py-1.5 rounded-md text-[10px] font-black tracking-wider text-gray-500 border border-[#1e2028] hover:text-orange-400 hover:border-orange-500/50">LOG OUT</button>}
+            <div className="flex items-center space-x-1 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]">
             {tabs.map((tab) => {
               const isActive = viewMode === tab.mode;
               return (
@@ -55,6 +60,7 @@ export const Chassis: React.FC<ChassisProps> = ({ children }) => {
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
 

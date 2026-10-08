@@ -143,3 +143,41 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #3a3e49;
 }
+
+.auth-input {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  border: 1px solid #2b2e38;
+  border-radius: 0.375rem;
+  background: #08090c;
+  padding: 0.65rem 0.75rem;
+  color: #e5e7eb;
+  outline: none;
+}
+
+.auth-input:focus {
+  border-color: rgb(249 115 22 / 0.7);
+  box-shadow: 0 0 0 1px rgb(249 115 22 / 0.25);
+}
+
+.auth-button {
+  width: 100%;
+  border: 1px solid rgb(251 146 60 / 0.7);
+  border-radius: 0.375rem;
+  background: linear-gradient(180deg, #ea580c, #9a3412);
+  padding: 0.65rem 0.75rem;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.auth-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.auth-link:hover {
+  color: #fb923c;
+}
