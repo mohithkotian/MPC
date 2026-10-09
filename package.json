@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "tsx server/index.ts",
+    "build:server": "tsc -p tsconfig.server.json",
     "prepare-samples": "tsx server/scripts/prepareSamples.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "db:migrate": "tsx server/db/migrate.ts",

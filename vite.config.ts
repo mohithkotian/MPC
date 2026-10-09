@@ -17,11 +17,14 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
+    // Dev-only proxy: routes /api/* to the local Express server so the browser
+    // does not need VITE_API_BASE during local development. In a deployed Render
+    // Static Site build, VITE_API_BASE points directly to the backend origin and
+    // this proxy is not used.
     proxy: {
       "/api": {
-        target: process.env.VITE_BACKEND_URL || "http://localhost:3000",
+        target: "http://localhost:3000",
         changeOrigin: true,
-        secure: process.env.VITE_BACKEND_URL?.startsWith("https://") ?? false,
       },
     },
   },

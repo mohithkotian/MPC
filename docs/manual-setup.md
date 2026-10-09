@@ -90,15 +90,17 @@ production/samples/<object-id>
 
 Do not upload copyrighted or unlicensed samples. Confirm that every sample used in production is legally authorized for your intended use.
 
-## 9. Configure deployment manually
+## 9. Configure native Render deployment manually
 
-On the hosting platform, create separate frontend and backend services or a managed full-stack deployment. Set the backend health check to:
+Create a Render Static Site for the frontend and a native Render Node Web Service for the backend. Do not use Docker, Docker Compose, Nginx, or Render Image Services for this topology. Set the backend health check to:
 
 ```text
 GET /api/health
 ```
 
-Configure a real domain, TLS, request timeout, memory/CPU limits, and billing alerts. Do not use the hard-coded Render hostname currently present in `nginx.conf`; replace it during the deployment-topology phase with an environment-specific service route.
+For the frontend, use `npm ci && npm run build` with `dist` as the publish directory. Set `VITE_API_BASE` to the native backend service URL and add the Render rewrite `/*` → `/index.html` with status `200` for SPA routes. For the backend, use `npm ci && npm run build:server` and start it with `npm run server`; Render supplies `PORT`.
+
+Set the backend `ALLOWED_ORIGINS` value to the exact frontend origin. Do not use wildcard CORS. Configure a real domain, TLS, request timeout, memory/CPU limits, and billing alerts.
 
 Production deployment must not happen until staging has passed authentication, cross-user authorization, sample delivery, rate-limit, backup-restore, and rollback tests.
 
