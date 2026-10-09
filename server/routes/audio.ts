@@ -32,8 +32,9 @@ function getManifest(): Record<string, SampleManifestEntry> {
 
 function resolvePresetSample(sampleId: string): { filename: string } | null {
   const manifest = getManifest();
-  if (manifest[sampleId]) {
-    const fn = storageFilename(manifest[sampleId].filename);
+  const directEntry = Object.prototype.hasOwnProperty.call(manifest, sampleId) ? manifest[sampleId] : undefined;
+  if (directEntry) {
+    const fn = storageFilename(directEntry.filename);
     if (fn) return { filename: fn };
   }
   for (const entry of Object.values(manifest)) {
