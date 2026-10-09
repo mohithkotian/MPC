@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import http from 'node:http';
 import test, { after, before } from 'node:test';
 
@@ -28,7 +28,19 @@ const { app } = await import('../index');
 const server = app.listen(0);
 const address = server.address() as { port: number };
 function request(path: string, headers: Record<string, string> = {}): Promise<{ status: number; body: any }> {
-  return new Promise((resolve, reject) => { const req = http.request({ port: address.port, path, method: 'GET', headers }, (res) => { let data = ''; res.on('data', (chunk) => { data += chunk; }); res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data ? JSON.parse(data) : null })); }); req.on('error', reject); req.end(); });
+  return new Promise((resolve, reject) => {
+    const req = http.request({ port: address.port, path, method: 'GET', headers }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        let parsed: any = null;
+        try { parsed = data ? JSON.parse(data) : null; } catch { parsed = data; }
+        resolve({ status: res.statusCode ?? 0, body: parsed });
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
 }
 
 test('protected session rejects missing bearer token', async () => { const result = await request('/api/auth/session'); assert.equal(result.status, 401); });
@@ -36,4 +48,6 @@ test('session returns the provider-verified identity', async () => { const resul
 test('me ignores a client-supplied user id and returns the verified profile', async () => { const result = await request('/api/me?user_id=99999999-9999-4999-8999-999999999999', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.id, userId); });
 test('organizations returns only the request-scoped user membership', async () => { const result = await request('/api/me/organizations', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.organizations[0].id, organizationId); });
 test('audio denies an unauthorized or cross-organization sample before file access', async () => { const result = await request(`/api/audio/stream/${sampleId}`, { Authorization: 'Bearer valid-token', 'x-organization-id': organizationId }); assert.equal(result.status, 404); });
+test('audio allows streaming preset kit samples for authenticated users', async () => { const result = await request('/api/audio/stream/kit1-pad1', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); });
+test('manifest returns preset sample catalog when no organization header is provided', async () => { const result = await request('/api/audio/manifest', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.ok(Object.keys(result.body).length > 0); });
 after(() => { server.close(); });

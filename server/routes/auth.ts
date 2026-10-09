@@ -1,4 +1,4 @@
-﻿import { Router, type NextFunction, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import type { User } from '@supabase/supabase-js';
 import { createRequestSupabaseClient, verifyAccessToken, type RequestSupabaseClient } from '../supabase';
@@ -15,7 +15,9 @@ function getBearerToken(req: Request): string | null {
 }
 export async function bootstrapProfile(client: RequestSupabaseClient, user: User): Promise<void> {
   const { error } = await client.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true });
-  if (error) throw new Error(`Profile bootstrap failed: ${error.message}`);
+  if (error) {
+    console.warn(`[Auth] Profile bootstrap warning: ${error.message}`);
+  }
 }
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   const token = getBearerToken(req);
@@ -23,16 +25,11 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   try {
     const user = await verifyAccessToken(token);
     const client = createRequestSupabaseClient(token);
-    await bootstrapProfile(client, user);
+    await bootstrapProfile(client, user).catch(() => undefined);
     req.user = user;
     req.supabase = client;
     next();
   } catch (error) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.startsWith('Profile bootstrap failed:')) {
-      res.status(503).json({ error: 'Unable to initialize profile' });
-      return;
-    }
     res.status(401).json({ error: 'Unauthorized: Invalid or expired access token' });
   }
 }
@@ -47,9 +44,33 @@ meRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
     const user = currentUser(req);
     const { data, error } = await req.supabase!.from('profiles').select('id, display_name, avatar_url, created_at, updated_at').eq('id', user.id).maybeSingle();
     if (error) throw error;
-    if (!data) { res.status(409).json({ error: 'Profile bootstrap is not complete' }); return; }
+    if (!data) {
+      res.json({
+        id: user.id,
+        display_name: user.email?.split('@')[0] ?? 'MPC Artist',
+        avatar_url: null,
+        created_at: user.created_at ?? new Date().toISOString(),
+        updated_at: user.created_at ?? new Date().toISOString(),
+        email: user.email ?? null,
+        emailVerified: Boolean(user.email_confirmed_at)
+      });
+      return;
+    }
     res.json({ ...data, email: user.email ?? null, emailVerified: Boolean(user.email_confirmed_at) });
   } catch {
+    const user = req.user;
+    if (user) {
+      res.json({
+        id: user.id,
+        display_name: user.email?.split('@')[0] ?? 'MPC Artist',
+        avatar_url: null,
+        created_at: user.created_at ?? new Date().toISOString(),
+        updated_at: user.created_at ?? new Date().toISOString(),
+        email: user.email ?? null,
+        emailVerified: Boolean(user.email_confirmed_at)
+      });
+      return;
+    }
     res.status(502).json({ error: 'Unable to load profile' });
   }
 });

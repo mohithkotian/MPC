@@ -1,29 +1,36 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: "0.0.0.0",
     port: 5173,
     open: false,
     allowedHosts: true,
     watch: {
       usePolling: true,
     },
+    // proxy: {
+    //   '/api': {
+    //     target:
+    //       process.env.VITE_BACKEND_URL ||
+    //       'https://mpc-backend-latest.onrender.com',
+    //     changeOrigin: true,
+    //     secure: true,
+    //   },
+    // },
     proxy: {
-      '/api': {
-        target:
-          process.env.VITE_BACKEND_URL ||
-          'https://mpc-backend-latest.onrender.com',
+      "/api": {
+        target: "http://localhost:3000",
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },
