@@ -27,3 +27,7 @@ public/runnaway.mp3/
 
 # secure samples
 server/storage/samples/
+
+# tool-generated working directories
+.manus/
+.work/

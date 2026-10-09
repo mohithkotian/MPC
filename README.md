@@ -1,6 +1,6 @@
 # MPC
 
-A browser-based Music Production Center built with React, TypeScript, and the Web Audio API, backed by a Node.js/Express secure audio streaming service. MPC lets a user trigger, sequence, and record audio pads in real time entirely in the browser, while keeping the underlying sample assets protected behind an authenticated, same-origin streaming layer.
+A browser-based Music Production Center built with React, TypeScript, and the Web Audio API, backed by a Node.js/Express secure audio streaming service. MPC lets a user trigger, sequence, and record audio pads in real time entirely in the browser, while keeping the underlying sample assets protected behind an authenticated streaming API.
 
 Author: [mohithkotian][def]
 
@@ -31,9 +31,9 @@ sequenceDiagram
 
     participant U  as User
     participant BR as Browser (React and TypeScript)
-    participant NG as nginx Reverse Proxy
+    participant API as Express API
     participant AA as Authentication API (Express and Supabase Auth)
-    participant SM as Security Middleware (Cookie, Origin, Rate Limit)
+    participant SM as Security Middleware (Origin, Rate Limit)
     participant SA as Secure Audio API (Express Stream)
     participant MS as Manifest Service (UUID Resolver)
     participant SS as Sample Storage (Outside Web Root)
@@ -53,8 +53,8 @@ sequenceDiagram
     rect rgb(20, 36, 28)
         Note over U,WA: Phase 2 - Sample Request and Security Validation
         U  ->>+ BR: Selects a pad (for example, Father or Runaway)
-        BR ->>+ NG: GET /api/audio/stream/:sampleId<br/>Authorization: Bearer accessToken<br/>Cache-Control: no-store
-        NG ->>+ SM: Proxy to backend
+        BR ->>+ API: GET ${VITE_API_BASE}/api/audio/stream/:sampleId<br/>Authorization: Bearer accessToken<br/>Cache-Control: no-store
+        API ->>+ SM: Authenticate and authorize request
 
         rect rgb(40, 20, 20)
             Note over SM: Security Middleware enforces all of the following
@@ -89,10 +89,8 @@ sequenceDiagram
         SS -->> SA: Raw audio binary stream
         deactivate SS
 
-        SA -->> NG: 200 OK, application/octet-stream<br/>Cache-Control: no-store, private
+        SA -->> BR: 200 OK, application/octet-stream<br/>Cache-Control: no-store, private
         deactivate SA
-        NG -->> BR: Forward audio stream
-        deactivate NG
     end
 
     rect rgb(28, 20, 48)
@@ -105,17 +103,6 @@ sequenceDiagram
         deactivate BR
     end
 
-    rect rgb(30, 28, 20)
-        Note over U,WA: Phase 5 - Token Refresh Cycle
-        BR ->>+ NG: Supabase client session refresh<br/>Cookie: Supabase session (HttpOnly, auto-sent)
-        NG ->>+ AA: Proxy request
-        AA ->>  AA: Verify refresh token signature<br/>Issue new access token (10 min)
-        AA -->> NG: 200 OK, accessToken
-        deactivate AA
-        NG -->> BR: Forward new access token
-        deactivate NG
-        BR ->>  BR: Update stored access token
-    end
 ```
 
 ---
@@ -126,14 +113,11 @@ sequenceDiagram
 Render Cloud
 
   mpc-frontend                        mpc-backend
-  nginx:alpine                        node:20-alpine
+  Render Static Site                  Render Node Web Service
   Vite build (React/TS)                Express server
-  dist/ static assets                    /api/auth/*
-                                          /api/audio/*
-                                          /api/health
-
-  /api/*  --- nginx reverse proxy --->  :3000
-  :8080                                 server/storage/samples/uuid.mp3
+  dist/ static assets                  /api/auth/*
+  VITE_API_BASE  --------------------> /api/audio/*
+                                        /api/health
 
            HTTPS
               |
@@ -141,7 +125,7 @@ Render Cloud
    React + Web Audio API
 ```
 
-The frontend and backend are deployed as two independent services on Render. All `/api/*` traffic from the browser is same-origin against `mpc-frontend`, which nginx transparently proxies to `mpc-backend`. This removes cross-site cookie and CORS restrictions entirely, since the browser only ever talks to a single origin.
+The frontend and backend are deployed as two independent native services on Render. The frontend build receives `VITE_API_BASE`, so browser API and audio requests go directly to the backend origin. The backend explicitly allows the deployed frontend origin through `ALLOWED_ORIGINS`; no wildcard CORS is used.
 
 ---
 
@@ -155,7 +139,7 @@ The frontend and backend are deployed as two independent services on Render. All
 | 2 | Direct link sharing and hotlinking | `Origin` and `Referer` headers are validated against `ALLOWED_ORIGINS`. Requests from unknown domains receive HTTP 403. |
 | 3 | Automated scraping | Per-IP rate limiting (`express-rate-limit`) restricts bulk harvesting. Each request requires an active authenticated session. |
 | 4 | Static file exposure | Samples are stored outside the web root at `server/storage/samples/` using opaque UUID filenames. Physical paths and original filenames are never exposed to clients. |
-| 5 | Token replay | Access tokens expire in 10 minutes. Refresh tokens are stored in HttpOnly, Secure cookies, inaccessible to JavaScript. |
+| 5 | Token replay | Supabase manages browser sessions and refresh; the API accepts only verified short-lived Bearer access tokens. |
 | 6 | Cache leakage | `Cache-Control: no-store, no-cache, must-revalidate, private` on all audio stream endpoints prevents browser and CDN caching. |
 
 ### Fundamental security boundary
@@ -171,13 +155,13 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 | Layer | Mechanism | Implementation |
 |-------|-----------|----------------|
 | Storage at rest | UUID obfuscation | Samples stored outside the web root using opaque UUID filenames. Real paths are never exposed. |
-| Access control | Supabase Bearer access tokens | Short-lived access tokens (10 minutes) signed with HS256, validated on every audio request. |
-| Session persistence | Supabase-managed browser session | `Supabase session` cookie: HttpOnly, Secure, SameSite policy set per deployment topology. Seven day expiry. |
-| Transport security | HTTPS/TLS | All streams delivered over TLS. nginx terminates SSL at the edge. |
+| Access control | Supabase Bearer access tokens | Supabase access tokens are verified on every audio request using the request-scoped client. |
+| Session persistence | Supabase-managed browser session | Browser session and refresh behavior are managed by the official Supabase client. |
+| Transport security | HTTPS/TLS | All streams delivered over TLS by Render and Supabase. |
 | Anti-hotlinking | Origin and Referer enforcement | Middleware rejects requests from domains not present in `ALLOWED_ORIGINS`. |
 | Rate limiting | IP-based throttle | `express-rate-limit`: 100 auth requests per 15 minutes per IP. |
 | Cache prevention | Strict Cache-Control | `no-store, no-cache, must-revalidate, private` on all `/api/audio/stream/*` endpoints. |
-| Reverse proxy | nginx with SNI | nginx proxies `/api/*` to the backend. `proxy_ssl_server_name on` handles Cloudflare SNI. DNS resolved every 30 seconds via a configured resolver. |
+| API routing | Native cross-origin API | `VITE_API_BASE` points the browser to the backend; explicit `ALLOWED_ORIGINS` protects cross-origin access. |
 
 ---
 
@@ -192,9 +176,9 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 | Backend runtime | Node.js 20, Express 4 |
 | Authentication | Supabase Auth (`@supabase/supabase-js`) and Bearer access tokens |
 | Security middleware | `helmet`, `cors`, `express-rate-limit` |
-| Production server | nginx:alpine (reverse proxy and static hosting) |
-| Containerization | Docker (multi-stage builds) |
-| Deployment | Render (Docker image deploy) |
+| Production frontend | Render Static Site serving Vite `dist/` |
+| Production backend | Native Render Node Web Service running Express |
+| Deployment | Render native services |
 
 ---
 
@@ -203,7 +187,7 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 ### Prerequisites
 
 - Node.js 20 or later
-- Docker (for containerized deployment)
+- Node.js 20 or later
 
 ### Development, both servers
 
@@ -220,16 +204,17 @@ npm run dev      # Vite frontend only
 npm run server   # Express backend only
 ```
 
-### Production, Docker
+### Production build
 
 ```bash
-# Backend
-docker build -f backend.Dockerfile -t mpc-backend .
-docker run -p 3000:3000 --env-file .env mpc-backend
+# Frontend static artifact
+npm ci
+npm run build
+# Publish dist/ with a static host and rewrite /* to /index.html.
 
-# Frontend, nginx and built static files
-docker build -f frontend.Dockerfile -t mpc-frontend .
-docker run -p 8080:8080 mpc-frontend
+# Backend validation and local start
+npm run build:server
+npm run server
 ```
 
 ---
@@ -240,6 +225,8 @@ docker run -p 8080:8080 mpc-frontend
 |----------|---------|----------|
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Supabase Auth project and publishable key | Yes |
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Browser Supabase Auth configuration | Yes |
+| `VITE_API_BASE` | Native backend origin used by browser API/audio requests | Yes for deployed frontend |
+| `STORAGE_PROVIDER` / `SUPABASE_STORAGE_BUCKET` | Private sample storage provider and bucket | Yes for staging/production |
 | `SERVER_ENCRYPTION_KEY` | 32-byte key for at-rest AES-256-GCM audio encryption | Yes, in production |
 | `ALLOWED_ORIGINS` | Comma-separated list of origins permitted to stream audio | Yes |
 | `NODE_ENV` | Set to `production` on deployment | Yes |
