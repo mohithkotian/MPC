@@ -20,14 +20,7 @@ Do not create production resources until you have decided whether MPC is single-
 
 ## 2. Generate secrets locally, then store them in the provider secret manager
 
-Do not send secrets in chat or commit them. Generate values with:
-
-```bash
-openssl rand -base64 48   # JWT_SECRET
-openssl rand -hex 32       # SERVER_ENCRYPTION_KEY, if the encryption utility accepts raw bytes/hex
-```
-
-Confirm the encryption utility’s expected representation before using the hex output. The current repository has a mismatch between its documented 32-byte key and its incomplete/legacy sample scripts, so do not encrypt production samples until Phase 2 verifies this contract.
+Do not send secrets in chat or commit them. Generate only the server encryption key with a secret manager or local secret generator. Supabase URL and publishable key are configured separately and are not authentication secrets. Do not generate JWT signing secrets; MPC no longer signs custom JWTs. Confirm the encryption utilityâ€™s expected representation before using the hex output. The current repository has a mismatch between its documented 32-byte key and its incomplete/legacy sample scripts, so do not encrypt production samples until Phase 2 verifies this contract.
 
 ## 3. Create three isolated environments
 
@@ -49,7 +42,10 @@ The backend will eventually require at least:
 ```text
 NODE_ENV=production
 PORT=3000
-JWT_SECRET=<secret-manager-value>
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=<publishable-key>
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=<publishable-key>
 SERVER_ENCRYPTION_KEY=<secret-manager-value>
 ALLOWED_ORIGINS=https://your-real-frontend-domain.example
 DATABASE_URL=<managed-postgres-url>
@@ -59,7 +55,6 @@ OBJECT_STORAGE_REGION=<region>
 OBJECT_STORAGE_ENDPOINT=<provider-endpoint-if-required>
 OBJECT_STORAGE_ACCESS_KEY_ID=<secret-manager-value>
 OBJECT_STORAGE_SECRET_ACCESS_KEY=<secret-manager-value>
-AUTH_PROVIDER_SECRET=<provider-secret>
 SENTRY_DSN=<server-side-dsn>
 ```
 
@@ -115,4 +110,4 @@ Production deployment must not happen until staging has passed authentication, c
 4. Generate and store secrets in the provider secret manager.
 5. Send back the provider choices and the deployment platform names, without sending any secret values.
 
-After those choices are confirmed, the next code branch should implement the database schema, provider adapters, and real authentication instead of inventing incompatible integrations.
+Phase 2 implements Supabase Auth in the browser and Express Bearer verification. Apply migrations only through the existing migration runner in an explicitly approved database operation.

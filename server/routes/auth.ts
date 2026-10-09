@@ -1,110 +1,68 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+﻿import { Router, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { JWT_SECRET } from '../config';
-
-export const authRouter = Router();
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-authRouter.use(authLimiter);
+import type { User } from '@supabase/supabase-js';
+import { createRequestSupabaseClient, verifyAccessToken, type RequestSupabaseClient } from '../supabase';
 
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    role: string;
-  };
+  user?: User;
+  supabase?: RequestSupabaseClient;
 }
-
-/**
- * Require valid Short-Lived Access Token (Bearer) for authentication
- */
-export function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: Missing or invalid Authorization header' });
-    return;
-  }
-
-  const token = authHeader.split(' ')[1];
+export const authRouter = Router();
+authRouter.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }));
+function getBearerToken(req: Request): string | null {
+  const header = req.headers.authorization;
+  return header && /^Bearer\s+\S+$/.test(header) ? header.slice(7).trim() : null;
+}
+export async function bootstrapProfile(client: RequestSupabaseClient, user: User): Promise<void> {
+  const { error } = await client.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) throw new Error(`Profile bootstrap failed: ${error.message}`);
+}
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  const token = getBearerToken(req);
+  if (!token) { res.status(401).json({ error: 'Unauthorized: Bearer token required' }); return; }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; username: string; role: string };
-    req.user = decoded;
+    const user = await verifyAccessToken(token);
+    const client = createRequestSupabaseClient(token);
+    await bootstrapProfile(client, user);
+    req.user = user;
+    req.supabase = client;
     next();
   } catch (error) {
-    console.warn(`[Security] Invalid or expired access token attempt from IP: ${req.ip}`);
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('Profile bootstrap failed:')) {
+      res.status(503).json({ error: 'Unable to initialize profile' });
+      return;
+    }
     res.status(401).json({ error: 'Unauthorized: Invalid or expired access token' });
   }
 }
-
-/**
- * POST /api/auth/login
- * Sets HttpOnly refresh cookie and returns a short-lived access token
- */
-authRouter.post('/login', (req: Request, res: Response) => {
-  const { username } = req.body || {};
-  const user = {
-    id: `usr-${Date.now()}`,
-    username: username || 'mpc-producer',
-    role: 'user',
-  };
-
-  // Short-lived Access Token (10 minutes)
-  const accessToken = jwt.sign(user, JWT_SECRET, { expiresIn: '10m' });
-  // Long-lived Refresh Token (7 days)
-  const refreshToken = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
-
-  // Use protocol detection (works behind Render's reverse proxy via 'trust proxy')
-  // req.secure is true on HTTPS (live), false on HTTP (localhost)
-  const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
-  res.cookie('pulse_refresh', refreshToken, {
-    httpOnly: true,
-    secure: isHttps,
-    sameSite: isHttps ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  res.json({
-    user,
-    accessToken,
-    message: 'Logged in successfully',
-  });
-});
-
-/**
- * POST /api/auth/refresh
- * Exchanges a valid HttpOnly refresh cookie for a new short-lived access token
- */
-authRouter.post('/refresh', (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.pulse_refresh;
-
-  if (!refreshToken) {
-    res.status(401).json({ error: 'Unauthorized: No refresh token provided' });
-    return;
-  }
-
+function currentUser(req: AuthenticatedRequest): User {
+  if (!req.user) throw new Error('Verified user missing from request');
+  return req.user;
+}
+export const meRouter = Router();
+meRouter.use(requireAuth);
+meRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const decoded = jwt.verify(refreshToken, JWT_SECRET) as { id: string; username: string; role: string };
-    const user = { id: decoded.id, username: decoded.username, role: decoded.role };
-
-    const newAccessToken = jwt.sign(user, JWT_SECRET, { expiresIn: '10m' });
-
-    res.json({ accessToken: newAccessToken });
-  } catch (error) {
-    res.status(401).json({ error: 'Unauthorized: Invalid or expired refresh token' });
+    const user = currentUser(req);
+    const { data, error } = await req.supabase!.from('profiles').select('id, display_name, avatar_url, created_at, updated_at').eq('id', user.id).maybeSingle();
+    if (error) throw error;
+    if (!data) { res.status(409).json({ error: 'Profile bootstrap is not complete' }); return; }
+    res.json({ ...data, email: user.email ?? null, emailVerified: Boolean(user.email_confirmed_at) });
+  } catch {
+    res.status(502).json({ error: 'Unable to load profile' });
   }
 });
-
-/**
- * GET /api/auth/session
- */
+meRouter.get('/organizations', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { data, error } = await req.supabase!.from('organizations').select('id, name, slug, organization_members!inner(role)').order('name', { ascending: true });
+    if (error) throw error;
+    res.json({ organizations: data ?? [] });
+  } catch {
+    res.status(502).json({ error: 'Unable to load organizations' });
+  }
+});
 authRouter.get('/session', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  res.json({ user: req.user });
+  const user = currentUser(req);
+  res.json({ user: { id: user.id, email: user.email ?? null, emailVerified: Boolean(user.email_confirmed_at) } });
 });

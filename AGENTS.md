@@ -1,4 +1,9 @@
-# MPC Project Memory
+﻿# MPC Project Memory
+
+## Current Phase 2 auth state
+Supabase Auth is the identity authority. The browser uses `@supabase/supabase-js` for email/password signup/login, email verification, official session refresh, logout, password reset, and password update. Express verifies Bearer access tokens with `supabase.auth.getUser(accessToken)` and uses a request-scoped caller-token client. No custom JWT, refresh cookie, demo username login, or fabricated identity is permitted.
+
+Profile bootstrap is idempotent through the authenticated application flow using verified `auth.uid()`. Migration `0002_auth_profile_bootstrap` adds only the self-insert RLS policy; it does not create a database trigger.
 
 ## What this product does
 MPC is a browser-based music production center. Users trigger and sequence audio pads in React using the Web Audio API; the Node/Express backend authenticates sessions and streams protected sample assets.
@@ -7,7 +12,7 @@ MPC is a browser-based music production center. Users trigger and sequence audio
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
 - Audio: Web Audio API + MediaPipe gesture input
 - Backend: Node.js 20 + Express 4 + TypeScript/tsx
-- Auth: current prototype uses JWT access tokens and an HttpOnly refresh cookie; this is not production-grade identity yet
+- Auth: Supabase Auth with browser-managed sessions and verified Bearer access tokens
 - Storage: local filesystem under `server/storage/samples` plus `manifest.json`; no database/object-storage abstraction yet
 - Deployment: separate Docker images for frontend/nginx and backend; current documentation targets Render
 - CI: GitHub Actions Semgrep workflow only
