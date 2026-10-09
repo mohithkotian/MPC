@@ -17,20 +17,11 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
-    // proxy: {
-    //   '/api': {
-    //     target:
-    //       process.env.VITE_BACKEND_URL ||
-    //       'https://mpc-backend-latest.onrender.com',
-    //     changeOrigin: true,
-    //     secure: true,
-    //   },
-    // },
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        target: process.env.VITE_BACKEND_URL || "http://localhost:3000",
         changeOrigin: true,
-        secure: false,
+        secure: process.env.VITE_BACKEND_URL?.startsWith("https://") ?? false,
       },
     },
   },
