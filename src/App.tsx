@@ -54,8 +54,10 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadPresetKit('kit1');
-  }, [loadPresetKit]);
+    if (session?.user?.email_confirmed_at) {
+      void loadPresetKit('kit1');
+    }
+  }, [session, loadPresetKit]);
 
   if (authLoading) {
     return <div className="min-h-screen bg-[#07080a] flex items-center justify-center text-orange-500 font-mono tracking-[0.25em]">RESTORING SESSION...</div>;

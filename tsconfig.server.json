@@ -1,4 +1,4 @@
-﻿{
+{
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -10,5 +10,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["server/**/*.ts"]
+  "include": ["server/**/*.ts"],
+  "exclude": ["server/scripts/**"]
 }
