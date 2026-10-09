@@ -16,7 +16,7 @@
     "db:test": "tsx server/db/tests/runDatabaseTests.ts",
     "typecheck:server": "tsc -p tsconfig.server.json",
     "test:auth": "node --import tsx --test server/tests/auth.test.ts",
-    "test:api": "node --import tsx --test server/tests/api.test.ts",
+    "test:api": "node --import tsx --test server/tests/api.test.ts server/tests/storage.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

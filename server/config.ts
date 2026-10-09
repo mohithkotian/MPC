@@ -1,6 +1,7 @@
-﻿import 'dotenv/config';
+import 'dotenv/config';
 import path from 'node:path';
 const isProduction = process.env.NODE_ENV === 'production';
+const isNonLocal = isProduction || process.env.NODE_ENV === 'staging';
 function required(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`FATAL: ${name} must be provided`);
@@ -12,6 +13,18 @@ export const PORT = configuredPort;
 export const SUPABASE_URL = required('SUPABASE_URL');
 export const SUPABASE_ANON_KEY = required('SUPABASE_ANON_KEY');
 export const SERVER_ENCRYPTION_KEY = required('SERVER_ENCRYPTION_KEY');
+const configuredStorageProvider = process.env.STORAGE_PROVIDER?.trim() || (isNonLocal ? 'supabase' : 'local');
+if (configuredStorageProvider !== 'local' && configuredStorageProvider !== 'supabase') {
+  throw new Error('FATAL: STORAGE_PROVIDER must be local or supabase');
+}
+if (isNonLocal && configuredStorageProvider !== 'supabase') {
+  throw new Error('FATAL: local storage is only allowed in local/test environments');
+}
+export const STORAGE_PROVIDER = configuredStorageProvider as 'local' | 'supabase';
+export const SUPABASE_STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || null;
+if (STORAGE_PROVIDER === 'supabase' && !SUPABASE_STORAGE_BUCKET) {
+  throw new Error('FATAL: SUPABASE_STORAGE_BUCKET must be provided when STORAGE_PROVIDER=supabase');
+}
 export const STORAGE_DIR = path.join(process.cwd(), 'server', 'storage');
 export const SAMPLES_DIR = path.join(STORAGE_DIR, 'samples');
 export const MANIFEST_PATH = path.join(STORAGE_DIR, 'manifest.json');
