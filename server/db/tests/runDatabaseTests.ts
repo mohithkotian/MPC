@@ -78,14 +78,16 @@ async function asAuthenticated<T>(
 async function run(): Promise<void> {
   await resetDatabase();
   await applyMigration(pool, '0001_multi_tenant_foundation.up.sql');
+  await applyMigration(pool, '0002_auth_profile_bootstrap.up.sql');
+  await applyMigration(pool, '0003_projects.up.sql');
 
   const tables = await pool.query<{ relname: string; relrowsecurity: boolean }>(
     `SELECT relname, relrowsecurity
      FROM pg_class
      WHERE relnamespace = 'public'::regnamespace
-       AND relname IN ('profiles', 'organizations', 'organization_members', 'samples', 'audit_events')`,
+     AND relname IN ('profiles', 'organizations', 'organization_members', 'samples', 'audit_events', 'projects')`,
   );
-  await assert(tables.rows.length === 5, 'all five application tables should exist');
+  await assert(tables.rows.length === 6, 'all six application tables should exist');
   await assert(tables.rows.every((table) => table.relrowsecurity), 'RLS should be enabled on every application table');
 
   const alphaUser = randomUUID();
@@ -189,6 +191,36 @@ async function run(): Promise<void> {
     client.query<{ id: string }>('SELECT id FROM public.samples'),
   );
   await assert(removedMembershipSamples.rows.length === 0, 'removed membership must not access samples');
+
+  const projectId = randomUUID();
+  await pool.query(
+    `INSERT INTO public.projects
+      (id, organization_id, owner_id, name, artist, bpm, swing, volume, bank, snapshot)
+     VALUES ($1, $2, $3, 'Alpha project', 'Alpha artist', 120, 0, 0.8, 'A', $4::jsonb)`,
+    [projectId, alphaOrganization.id, alphaUser, JSON.stringify({ activeBank: 'A', banks: {}, patterns: {} })],
+  );
+  await expectRejected(
+    () => pool.query(
+      `INSERT INTO public.projects
+        (organization_id, owner_id, name, artist, bpm, swing, volume, bank, snapshot)
+       VALUES ($1, $2, 'Cross-org owner', '', 120, 0, 1, 'A', '{}'::jsonb)`,
+      [alphaOrganization.id, betaUser],
+    ),
+    'project owner from another organization must be rejected by PostgreSQL',
+  );
+  await expectRejected(
+    () => pool.query(
+      `INSERT INTO public.projects
+        (organization_id, owner_id, name, artist, bpm, swing, volume, bank, snapshot)
+       VALUES ($1, $2, 'Inactive owner', '', 120, 0, 1, 'A', '{}'::jsonb)`,
+      [alphaOrganization.id, removedUser],
+    ),
+    'project owner with inactive membership must be rejected by PostgreSQL',
+  );
+  await expectRejected(
+    () => pool.query('UPDATE public.projects SET owner_id = $1 WHERE id = $2', [betaUser, projectId]),
+    'project ownership updates must not bypass the invariant',
+  );
 
   const viewerSamples = await asAuthenticated(alphaViewer, (client) =>
     client.query<{ id: string }>('SELECT id FROM public.samples'),

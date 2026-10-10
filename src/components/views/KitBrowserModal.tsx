@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { loadProjectsFromDB } from '../../services/db/storage';
+import { listCloudProjects } from '../../services/projects/projectApi';
 import { ProjectData } from '../../types';
 import { PRESET_KITS } from '../../services/audio/presetKits';
 import { Folder, Save, Disc, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -12,6 +13,8 @@ export const KitBrowserModal: React.FC = () => {
     loadPresetKit,
     saveCurrentProject,
     loadProjectFromStorage,
+    saveStatus,
+    lastSaveError,
   } = useStore();
 
   const [savedProjects, setSavedProjects] = useState<ProjectData[]>([]);
@@ -19,8 +22,17 @@ export const KitBrowserModal: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fetchSavedProjects = async () => {
-    const list = await loadProjectsFromDB();
-    setSavedProjects(list);
+    try {
+      setSavedProjects(await listCloudProjects());
+    } catch {
+      try {
+        setSavedProjects(await loadProjectsFromDB());
+        setStatusMessage('Cloud unavailable; showing local projects.');
+      } catch {
+        setSavedProjects([]);
+        setStatusMessage('Cloud and local projects are unavailable.');
+      }
+    }
   };
 
   useEffect(() => {
@@ -29,9 +41,15 @@ export const KitBrowserModal: React.FC = () => {
 
   const handleSave = async () => {
     if (!newProjectName.trim()) return;
-    await saveCurrentProject(newProjectName.trim());
+    const outcome = await saveCurrentProject(newProjectName.trim());
     await fetchSavedProjects();
-    setStatusMessage('Project saved!');
+    setStatusMessage(
+      outcome === 'cloud-success'
+        ? 'Project saved to cloud.'
+        : outcome === 'local-only'
+          ? `Cloud unavailable; local safety save succeeded.${lastSaveError ? ` ${lastSaveError}` : ''}`
+          : 'Cloud and local project saves failed.',
+    );
     setTimeout(() => setStatusMessage(null), 3000);
   };
 

@@ -3,6 +3,9 @@ import { BankId, BankPattern, PadConfig, ProjectData, ViewMode } from '../types'
 import { audioEngine } from '../services/audio/AudioEngine';
 import { createEmptyBank, PRESET_KITS } from '../services/audio/presetKits';
 import { saveProjectToDB, saveSampleBlobToDB } from '../services/db/storage';
+import { saveCloudProject } from '../services/projects/projectApi';
+
+export type ProjectSaveStatus = 'idle' | 'cloud-success' | 'local-only' | 'failed';
 
 interface MPCState {
   activeBank: BankId;
@@ -24,6 +27,8 @@ interface MPCState {
   projectId: string;
   projectName: string;
   projectArtist: string;
+  saveStatus: ProjectSaveStatus;
+  lastSaveError: string | null;
   activePresetId: string;
   customKitNames: Record<string, string>;
 
@@ -71,7 +76,7 @@ interface MPCState {
   advanceStep: () => void;
 
   loadPresetKit: (kitId: string) => Promise<void>;
-  saveCurrentProject: (name?: string) => Promise<void>;
+  saveCurrentProject: (name?: string) => Promise<ProjectSaveStatus>;
   loadProjectFromStorage: (project: ProjectData) => Promise<void>;
 }
 
@@ -122,6 +127,8 @@ export const useStore = create<MPCState>((set, get) => {
     projectId: 'default-project',
     projectName: 'MPC SESSION',
     projectArtist: '',
+    saveStatus: 'idle',
+    lastSaveError: null,
     activePresetId: 'kit1',
     customKitNames: {
       kit1: 'FATHER',
@@ -455,7 +462,7 @@ export const useStore = create<MPCState>((set, get) => {
 
       const kitDisplayName = get().customKitNames[preset.id] || preset.name;
       set({
-        projectId: `${preset.id}-${Date.now()}`,
+        projectId: 'default-project',
         projectName: kitDisplayName,
         projectArtist: preset.artist,
         bpm: preset.bpm,
@@ -469,8 +476,9 @@ export const useStore = create<MPCState>((set, get) => {
     saveCurrentProject: async (name) => {
       const state = get();
       const projName = name || state.projectName;
+      const now = Date.now();
       const project: ProjectData = {
-        id: state.projectId || `proj-${Date.now()}`,
+        id: state.projectId || 'default-project',
         name: projName,
         artist: state.projectArtist,
         bpm: state.bpm,
@@ -479,11 +487,26 @@ export const useStore = create<MPCState>((set, get) => {
         activeBank: state.activeBank,
         banks: state.banks,
         patterns: state.patterns,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: now,
+        updatedAt: now,
       };
-      await saveProjectToDB(project);
-      set({ projectName: projName });
+      try {
+        const cloudProject = await saveCloudProject(project);
+        try { await saveProjectToDB(cloudProject); } catch { /* cloud is authoritative after success */ }
+        set({ projectId: cloudProject.id, projectName: projName, saveStatus: 'cloud-success', lastSaveError: null });
+        return 'cloud-success';
+      } catch (cloudError) {
+        try {
+          await saveProjectToDB(project);
+          const message = cloudError instanceof Error ? cloudError.message : 'Cloud project unavailable';
+          set({ projectName: projName, saveStatus: 'local-only', lastSaveError: message });
+          return 'local-only';
+        } catch (localError) {
+          const message = localError instanceof Error ? localError.message : 'Local project save failed';
+          set({ saveStatus: 'failed', lastSaveError: message });
+          return 'failed';
+        }
+      }
     },
 
     loadProjectFromStorage: async (project) => {
