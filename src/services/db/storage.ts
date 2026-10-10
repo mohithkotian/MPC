@@ -39,22 +39,13 @@ function getDB() {
 }
 
 export async function saveProjectToDB(project: ProjectData): Promise<void> {
-  try {
-    const db = await getDB();
-    await db.put('projects', project);
-  } catch (err) {
-    console.error('Failed to save project to IndexedDB:', err);
-  }
+  const db = await getDB();
+  await db.put('projects', project);
 }
 
 export async function loadProjectsFromDB(): Promise<ProjectData[]> {
-  try {
-    const db = await getDB();
-    return await db.getAll('projects');
-  } catch (err) {
-    console.error('Failed to load projects from IndexedDB:', err);
-    return [];
-  }
+  const db = await getDB();
+  return db.getAll('projects');
 }
 
 export async function deleteProjectFromDB(id: string): Promise<void> {
