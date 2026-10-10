@@ -17,6 +17,7 @@ export const Chassis: React.FC<ChassisProps> = ({ children, userEmail, onLogout 
     { mode: 'STEP_EDIT', label: 'SEQUENCER', icon: <Layers className="w-3.5 h-3.5" /> },
     { mode: 'MIXER', label: 'MIXER', icon: <Sliders className="w-3.5 h-3.5" /> },
     { mode: 'SAMPLING', label: 'SAMPLE', icon: <Music className="w-3.5 h-3.5" /> },
+    { mode: 'KITS', label: 'KITS', icon: <Disc className="w-3.5 h-3.5" /> },
   ];
 
   return (

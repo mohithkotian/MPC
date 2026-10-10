@@ -52,12 +52,12 @@ before(() => {
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
         const created = { ...project, ...body, id: projectId, organization_id: organizationId, owner_id: userId };
         projects.splice(0, projects.length, created);
-        return json([created], 201);
+        return json(created, 201);
       }
       if (method === 'PATCH') {
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
         Object.assign(project, body, { updated_at: '2026-01-02T00:00:00.000Z' });
-        return json([project]);
+        return json(project);
       }
       if (method === 'GET') {
         if (url.includes(`id=eq.${projectId}`)) return json(project.deleted_at ? [] : [project]);
