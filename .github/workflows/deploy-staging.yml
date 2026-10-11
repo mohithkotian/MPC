@@ -1,0 +1,143 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify staging
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master') &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.repository.full_name == github.repository
+      }}
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Validate trusted CI provenance
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_REPOSITORY: ${{ github.event.workflow_run.repository.full_name }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          test "$RUN_EVENT" = "push"
+          test "$RUN_BRANCH" = "main" || test "$RUN_BRANCH" = "master"
+          test "$RUN_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$HEAD_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$RUN_CONCLUSION" = "success"
+          [[ "$RUN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Download smoke artifact from the exact trusted CI run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: staging-smoke-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/staging-smoke
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify smoke artifact commit
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          test "$(cat "$RUNNER_TEMP/staging-smoke/release-sha")" = "$EXPECTED_SHA"
+          test -s "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"
+          test -s "$RUNNER_TEMP/staging-smoke/staging-smoke-auth.mjs"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.22.0
+
+      - name: Validate staging configuration before deployment
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs" --validate-config
+
+      - name: Verify staging account and fixtures before deployment
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs" --preflight
+
+      - name: Validate both Render staging deploy hooks
+        env:
+          RENDER_STAGING_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_BACKEND_DEPLOY_HOOK }}
+          RENDER_STAGING_FRONTEND_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
+        run: |
+          set -eu
+          test -n "$RENDER_STAGING_BACKEND_DEPLOY_HOOK"
+          test -n "$RENDER_STAGING_FRONTEND_DEPLOY_HOOK"
+
+      - name: Trigger backend Render staging deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_BACKEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Trigger frontend Render staging deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Wait for staging backend readiness
+        env:
+          BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+        run: |
+          test -n "$BASE_URL"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 10 "$BASE_URL/api/ready" >/dev/null; then exit 0; fi
+            sleep 10
+          done
+          echo "Staging backend did not become ready in the allotted time" >&2
+          exit 1
+
+      - name: Run bounded staging smoke test
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"

@@ -173,7 +173,7 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 | Build tool | Vite 6 |
 | Audio engine | Web Audio API (`AudioContext`) |
 | State management | Zustand |
-| Backend runtime | Node.js 20, Express 4 |
+| Backend runtime | Node.js 22.22.0, Express 4 |
 | Authentication | Supabase Auth (`@supabase/supabase-js`) and Bearer access tokens |
 | Security middleware | `helmet`, `cors`, `express-rate-limit` |
 | Production frontend | Render Static Site serving Vite `dist/` |
@@ -186,8 +186,8 @@ Client-side obfuscation techniques such as DevTools blocking, right-click disabl
 
 ### Prerequisites
 
-- Node.js 20 or later
-- Node.js 20 or later
+- Node.js 22.22.0 for the pinned deployment runtime, or another Node.js release satisfying `>=22.0.0 <25.0.0`
+- Node.js 22.22.0 for the pinned deployment runtime, or another Node.js release satisfying `>=22.0.0 <25.0.0`
 
 ### Development, both servers
 

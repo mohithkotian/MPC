@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { ALLOWED_ORIGINS } from '../config';
+import { incrementMetric, log, requestId } from '../observability';
 
 /**
  * Middleware enforcing no-store headers on all audio/key/token responses
@@ -24,7 +25,8 @@ export function antiHotlink(req: Request, res: Response, next: NextFunction): vo
   const referer = req.headers.referer;
 
   if (origin && !ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))) {
-    console.warn(`[SECURITY AUDIT] Blocked hotlinked request from Unauthorized Origin: ${origin}`);
+    incrementMetric('security_rejections_total', { reason: 'origin' });
+    log('warn', 'security.origin_rejected', { requestId: requestId(req), origin });
     res.status(403).json({ error: 'Forbidden: Unauthorized Origin' });
     return;
   }
@@ -32,7 +34,8 @@ export function antiHotlink(req: Request, res: Response, next: NextFunction): vo
   if (referer) {
     const isRefererAllowed = ALLOWED_ORIGINS.some(allowed => referer.startsWith(allowed));
     if (!isRefererAllowed) {
-      console.warn(`[SECURITY AUDIT] Blocked hotlinked request from Unauthorized Referer: ${referer}`);
+      incrementMetric('security_rejections_total', { reason: 'referer' });
+      log('warn', 'security.referer_rejected', { requestId: requestId(req), referer });
       res.status(403).json({ error: 'Forbidden: Unauthorized Referer' });
       return;
     }
@@ -68,7 +71,8 @@ export const audioRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
-    console.warn(`[SECURITY AUDIT] Rate limit exceeded for IP: ${req.ip}. Triggering 15-minute ban.`);
+    incrementMetric('rate_limit_rejections_total', { route: req.baseUrl || 'unmatched' });
+    log('warn', 'security.rate_limit_rejected', { requestId: requestId(req), route: req.path });
     blocklist.set(req.ip!, Date.now() + 15 * 60 * 1000); // 15-minute ban
     res.status(429).json({ error: 'Too many sample stream requests. Temporary ban applied.' });
   }

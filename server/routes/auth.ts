@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import rateLimit from 'express-rate-limit';
 import type { User } from '@supabase/supabase-js';
 import { createRequestSupabaseClient, verifyAccessToken, type RequestSupabaseClient } from '../supabase';
+import { log, requestId } from '../observability';
 
 export interface AuthenticatedRequest extends Request {
   user?: User;
@@ -13,10 +14,10 @@ function getBearerToken(req: Request): string | null {
   const header = req.headers.authorization;
   return header && /^Bearer\s+\S+$/.test(header) ? header.slice(7).trim() : null;
 }
-export async function bootstrapProfile(client: RequestSupabaseClient, user: User): Promise<void> {
+export async function bootstrapProfile(client: RequestSupabaseClient, user: User, requestIdValue = 'unknown'): Promise<void> {
   const { error } = await client.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true });
   if (error) {
-    console.warn(`[Auth] Profile bootstrap warning: ${error.message}`);
+    log('warn', 'auth.profile_bootstrap_failed', { requestId: requestIdValue, error: error.message });
   }
 }
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
@@ -25,11 +26,12 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   try {
     const user = await verifyAccessToken(token);
     const client = createRequestSupabaseClient(token);
-    await bootstrapProfile(client, user).catch(() => undefined);
+    await bootstrapProfile(client, user, requestId(req)).catch(() => undefined);
     req.user = user;
     req.supabase = client;
     next();
   } catch (error) {
+    log('warn', 'auth.access_token_rejected', { requestId: requestId(req), error: error instanceof Error ? error.message : 'provider verification failed' });
     res.status(401).json({ error: 'Unauthorized: Invalid or expired access token' });
   }
 }

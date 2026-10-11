@@ -11,7 +11,7 @@ MPC is a browser-based music production center. Users trigger and sequence audio
 ## Current stack (do not change without a reviewed ADR)
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
 - Audio: Web Audio API + MediaPipe gesture input
-- Backend: Node.js 20 + Express 4 + TypeScript/tsx
+- Backend: Node.js 22.22.0 + Express 4 + TypeScript/tsx
 - Auth: Supabase Auth with browser-managed sessions and verified Bearer access tokens
 - Storage: `SampleStorage` abstraction with local filesystem for development/tests and private Supabase Storage for staging/production
 - Deployment: native Render Static Site frontend plus native Render Node Web Service backend; no Docker/nginx deployment dependency
@@ -53,3 +53,7 @@ Use a modular monolith first. Keep route handlers thin and move identity/session
 
 ## Key project risks currently known
 See `docs/production-readiness-plan.md`. Do not describe the app as production-ready until the release-blocking findings and verification gates there are closed.
+
+## Phase 5.7 status
+The local Phase 5.7 implementation adds request-ID propagation, structured redacted request logs, bounded diagnostic counters, focused observability tests, a staging smoke-test entry point, and release/incident/backup/rollback runbooks. Phase 5.6 CI/staging/production workflows and ADRs 0006/0007 were recovered from retained local worktree history; the 26 tracked sample binaries were removed from the proposed working-tree diff without rewriting Git history. Provider alert configuration, staging end-to-end verification, an isolated database restore drill, a staging rollback rehearsal, and historical sample licensing/exposure review remain external gates and must be recorded as evidence before production readiness is claimed. See `docs/phase-5-7-readiness.md` and `docs/decisions/0008-phase-5-7-observability-and-operations.md`.
+The staging deployment handoff now accepts only successful same-repository push CI runs on `main` or `master`, downloads an exact-SHA smoke artifact, and never checks out workflow-run code. Production verification disables checkout credential persistence and keeps production secrets in the separate protected deploy job. See `docs/decisions/0012-trusted-deployment-workflow.md`.
