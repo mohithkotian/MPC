@@ -26,6 +26,10 @@ The existing Semgrep workflow remains a separate required security check. Reposi
 
 The database test harness drops and recreates schemas. CI points it only at the disposable PostgreSQL service container through `TEST_DATABASE_URL`; it must never receive staging or production `DATABASE_URL` values.
 
+## Node.js runtime contract
+
+The locked `@supabase/auth-js@2.117.3` dependency requires Node.js `>=22.0.0`. CI and both deployment workflows use Node.js `22.22.0`; the repository `.node-version` file pins native Render/local selection to that version, while the `package.json` engine range (`>=22.0.0 <25.0.0`) also permits the verified local Node.js 24 runtime. Configure `NODE_VERSION=22.22.0` for both Render services, or verify that the service uses the repository `.node-version` file. Render advises using an explicit bounded version rather than an unbounded range.
+
 ## Staging deployment
 
 `deploy-staging.yml` runs only after a successful CI workflow on `main` or `master`. It uses the protected GitHub `staging` environment, triggers the separate backend and frontend Render deploy hooks, waits for `GET /api/ready`, and runs `npm run test:staging-smoke`.

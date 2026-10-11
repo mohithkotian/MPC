@@ -11,7 +11,7 @@ MPC is a browser-based music production center. Users trigger and sequence audio
 ## Current stack (do not change without a reviewed ADR)
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS
 - Audio: Web Audio API + MediaPipe gesture input
-- Backend: Node.js 20 + Express 4 + TypeScript/tsx
+- Backend: Node.js 22.22.0 + Express 4 + TypeScript/tsx
 - Auth: Supabase Auth with browser-managed sessions and verified Bearer access tokens
 - Storage: `SampleStorage` abstraction with local filesystem for development/tests and private Supabase Storage for staging/production
 - Deployment: native Render Static Site frontend plus native Render Node Web Service backend; no Docker/nginx deployment dependency
