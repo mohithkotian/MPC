@@ -60,6 +60,11 @@ test('me ignores a client-supplied user id and returns the verified profile', as
 test('organizations returns only the request-scoped user membership', async () => { const result = await request('/api/me/organizations', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.organizations[0].id, organizationId); });
 test('audio denies an unauthorized or cross-organization sample before file access', async () => { const result = await request(`/api/audio/stream/${sampleId}`, { Authorization: 'Bearer valid-token', 'x-organization-id': organizationId }); assert.equal(result.status, 404); });
 test('audio allows streaming preset kit samples for authenticated users', async () => { const result = await request('/api/audio/stream/kit1-pad1', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); });
+test('audio returns a non-enumerating 404 when a preset catalog alias has no local test object', async () => {
+  const result = await request('/api/audio/stream/kit1-pad11', { Authorization: 'Bearer valid-token' });
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, { error: 'Sample not found' });
+});
 test('manifest returns preset sample catalog when no organization header is provided', async () => { const result = await request('/api/audio/manifest', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.ok(Object.keys(result.body).length > 0); });
 after(async () => {
   globalThis.fetch = originalFetch;
