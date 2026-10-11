@@ -17,6 +17,7 @@ interface SampleManifestEntry {
 
 export interface AuthorizedSample {
   storageKey: string;
+  sampleId?: string;
 }
 
 type StorageFactory = (req: AuthenticatedRequest) => SampleStorage;
@@ -70,9 +71,48 @@ export async function authorizeTenantSample(req: AuthenticatedRequest): Promise<
   return { storageKey: data.storage_key };
 }
 
+export async function authorizePresetSample(req: AuthenticatedRequest): Promise<AuthorizedSample | null> {
+  const match = /^(kit[1-9][0-9]*)-pad([1-9][0-9]*)$/.exec(req.params.sampleId);
+  if (!match || !req.supabase || !req.user) return null;
+  const kitId = match[1];
+  const padIndex = Number(match[2]) - 1;
+  if (!Number.isSafeInteger(padIndex) || padIndex > 63) return null;
+
+  const requestedOrganizationId = req.header('x-organization-id');
+  if (!requestedOrganizationId || !UUID_PATTERN.test(requestedOrganizationId)) return null;
+
+  const { data: membership, error: membershipError } = await req.supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', req.user.id)
+    .eq('organization_id', requestedOrganizationId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (membershipError || !membership || membership.organization_id !== requestedOrganizationId) return null;
+
+  const { data: samples, error: sampleError } = await req.supabase
+    .from('samples')
+    .select('id, organization_id, storage_key, status')
+    .eq('organization_id', membership.organization_id)
+    .eq('kit_id', kitId)
+    .eq('pad_index', padIndex)
+    .eq('status', 'ready')
+    .is('deleted_at', null)
+    .limit(2);
+  if (sampleError || !samples || samples.length !== 1) return null;
+  const sample = samples[0];
+  if (sample.organization_id !== membership.organization_id || !isSafeStorageKey(sample.storage_key)) return null;
+  return { sampleId: sample.id, storageKey: sample.storage_key };
+}
+
 async function authorizeSample(req: AuthenticatedRequest): Promise<AuthorizedSample | null> {
   const sampleId = req.params.sampleId;
-  if (!UUID_PATTERN.test(sampleId)) return resolvePresetSample(sampleId);
+  if (!UUID_PATTERN.test(sampleId)) {
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+      return authorizePresetSample(req);
+    }
+    return resolvePresetSample(sampleId);
+  }
   return authorizeTenantSample(req);
 }
 
@@ -91,9 +131,16 @@ export function createAudioRouter(storageFactory: StorageFactory = (req) => crea
 
   router.get('/manifest', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
     const organizationId = req.header('x-organization-id');
+    const isNonLocal = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
     if (organizationId) {
       if (!UUID_PATTERN.test(organizationId)) { res.status(400).json({ error: 'x-organization-id must be a UUID' }); return; }
       const { data, error } = await req.supabase!.from('samples').select('id, original_name, kit_id, pad_index').eq('organization_id', organizationId).is('deleted_at', null).eq('status', 'ready');
+      if (error) { res.status(502).json({ error: 'Unable to load sample catalog' }); return; }
+      res.json(Object.fromEntries((data ?? []).map((sample) => [sample.id, { id: sample.id, kitId: sample.kit_id, padIndex: sample.pad_index, name: sample.original_name }])));
+      return;
+    }
+    if (isNonLocal) {
+      const { data, error } = await req.supabase!.from('samples').select('id, original_name, kit_id, pad_index').is('deleted_at', null).eq('status', 'ready');
       if (error) { res.status(502).json({ error: 'Unable to load sample catalog' }); return; }
       res.json(Object.fromEntries((data ?? []).map((sample) => [sample.id, { id: sample.id, kitId: sample.kit_id, padIndex: sample.pad_index, name: sample.original_name }])));
       return;

@@ -5,7 +5,7 @@ import test from 'node:test';
 import os from 'node:os';
 import path from 'node:path';
 import type { AuthenticatedRequest } from '../routes/auth';
-import { authorizeTenantSample, authorizeThenCreateStorage } from '../routes/audio';
+import { authorizePresetSample, authorizeTenantSample, authorizeThenCreateStorage } from '../routes/audio';
 import { LocalSampleStorage, StorageProviderError, SupabaseStorage, isSafeStorageKey, type SampleStorage } from '../storage/SampleStorage';
 
 const userId = '22222222-2222-4222-8222-222222222222';
@@ -39,6 +39,34 @@ function requestWithDatabase(sample: SampleRow | null, membership: MembershipRow
   return { params: { sampleId }, user: { id: userId } as never, supabase: client as never } as unknown as AuthenticatedRequest;
 }
 
+function presetRequestWithDatabase(samples: Array<SampleRow & { id: string; kit_id?: string; pad_index?: number }>, memberships: MembershipRow[], organizationHeader?: string, alias = 'kit1-pad11'): AuthenticatedRequest {
+  const client = {
+    from(table: string) {
+      let rows: Array<Record<string, unknown>> = (table === 'organization_members'
+        ? memberships
+        : samples.map((sample) => ({ ...sample, kit_id: sample.kit_id ?? 'kit1', pad_index: sample.pad_index ?? 10, deleted_at: null }))) as Array<Record<string, unknown>>;
+      const chain = {
+        select() { return chain; },
+        eq(column: string, value: unknown) { rows = rows.filter((row) => row[column] === value); return chain; },
+        is(column: string, value: unknown) { rows = rows.filter((row) => row[column] === value); return chain; },
+        in(column: string, values: unknown[]) { rows = rows.filter((row) => values.includes(row[column])); return chain; },
+        limit(count: number) { rows = rows.slice(0, count); return Promise.resolve({ data: rows, error: null }); },
+        maybeSingle() { return Promise.resolve({ data: rows[0] ?? null, error: null }); },
+        then(resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown, reject?: (reason: unknown) => unknown) {
+          return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+        },
+      };
+      return chain;
+    },
+  };
+  return {
+    params: { sampleId: alias },
+    user: { id: userId } as never,
+    supabase: client as never,
+    header: (name: string) => name.toLowerCase() === 'x-organization-id' ? organizationHeader : undefined,
+  } as unknown as AuthenticatedRequest;
+}
+
 test('authorized same-organization sample returns its trusted storage key', async () => {
   const result = await authorizeTenantSample(requestWithDatabase(
     { organization_id: organizationId, storage_key: storageKey, status: 'ready' },
@@ -53,6 +81,81 @@ test('cross-organization sample is denied by the membership check', async () => 
     null,
   ));
   assert.equal(result, null);
+});
+
+test('preset alias resolves to the unique ready sample row in an active member organization', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready' }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+    organizationId,
+  ));
+  assert.deepEqual(result, { sampleId, storageKey });
+});
+
+test('RUNAWAY kit2-pad1 resolves to catalog pad index zero', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready', kit_id: 'kit2', pad_index: 0 }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+    organizationId,
+    'kit2-pad1',
+  ));
+  assert.deepEqual(result, { sampleId, storageKey });
+});
+
+test('staging and production preset routes resolve aliases through the database catalog', async () => {
+  const previousEnvironment = process.env.NODE_ENV;
+  try {
+    for (const environment of ['staging', 'production']) {
+      process.env.NODE_ENV = environment;
+      const authorized = await authorizeThenCreateStorage(
+        presetRequestWithDatabase(
+          [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready' }],
+          [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+          organizationId,
+        ),
+        () => ({ get: async () => null }),
+      );
+      assert.deepEqual(authorized?.sample, { sampleId, storageKey });
+    }
+  } finally {
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
+  }
+});
+
+test('preset alias resolution denies requests without an active organization context', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready' }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+  ));
+  assert.equal(result, null);
+});
+
+test('preset alias with a missing catalog row is denied', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [], [{ organization_id: organizationId, user_id: userId, deleted_at: null }], organizationId,
+  ));
+  assert.equal(result, null);
+});
+
+test('preset alias cannot resolve a row in an organization where the caller is not a member', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: otherOrganizationId, storage_key: storageKey, status: 'ready' }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }], organizationId,
+  ));
+  assert.equal(result, null);
+});
+
+test('authorized sample with an absent private storage object remains absent', async () => {
+  const authorized = await authorizeThenCreateStorage(
+    presetRequestWithDatabase(
+      [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready' }],
+      [{ organization_id: organizationId, user_id: userId, deleted_at: null }], organizationId,
+    ),
+    () => ({ get: async () => null }),
+  );
+  assert.ok(authorized);
+  assert.equal(await authorized.storage.get(authorized.sample.storageKey), null);
 });
 
 test('inactive or removed membership is denied', async () => {
