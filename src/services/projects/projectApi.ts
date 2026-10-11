@@ -1,5 +1,6 @@
 import type { ProjectData } from '../../types';
 import { getSession } from '../auth/supabaseAuth';
+import { getActiveOrganizationId, OrganizationContextError, organizationRequestHeaders } from '../auth/organizationContext';
 import { projectFromCloudRecord, serializeProject } from './projectSerialization';
 
 export class CloudProjectError extends Error {
@@ -29,12 +30,12 @@ async function accessToken(): Promise<string> {
 }
 
 async function organizationId(token: string): Promise<string> {
-  const response = await fetch('/api/me/organizations', { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new CloudProjectError(response.status, 'Unable to determine organization access');
-  const body = await response.json() as { organizations?: Array<{ id: string }> };
-  const id = body.organizations?.[0]?.id;
-  if (!id) throw new CloudProjectError(403, 'No active organization is available');
-  return id;
+  try {
+    return await getActiveOrganizationId(token);
+  } catch (error) {
+    const status = error instanceof OrganizationContextError ? error.status : 502;
+    throw new CloudProjectError(status, status === 403 ? 'No active organization is available' : 'Unable to determine organization access');
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -43,8 +44,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
-      'x-organization-id': orgId,
+      ...organizationRequestHeaders(token, orgId),
       'Content-Type': 'application/json',
       ...(init.headers ?? {}),
     },

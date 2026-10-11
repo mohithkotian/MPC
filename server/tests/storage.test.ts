@@ -51,6 +51,7 @@ function presetRequestWithDatabase(samples: Array<SampleRow & { id: string; kit_
         is(column: string, value: unknown) { rows = rows.filter((row) => row[column] === value); return chain; },
         in(column: string, values: unknown[]) { rows = rows.filter((row) => values.includes(row[column])); return chain; },
         limit(count: number) { rows = rows.slice(0, count); return Promise.resolve({ data: rows, error: null }); },
+        maybeSingle() { return Promise.resolve({ data: rows[0] ?? null, error: null }); },
         then(resolve: (result: { data: Array<Record<string, unknown>>; error: null }) => unknown, reject?: (reason: unknown) => unknown) {
           return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
         },
@@ -120,6 +121,14 @@ test('staging and production preset routes resolve aliases through the database 
     if (previousEnvironment === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = previousEnvironment;
   }
+});
+
+test('preset alias resolution denies requests without an active organization context', async () => {
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: storageKey, status: 'ready' }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+  ));
+  assert.equal(result, null);
 });
 
 test('preset alias with a missing catalog row is denied', async () => {

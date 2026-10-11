@@ -78,24 +78,22 @@ export async function authorizePresetSample(req: AuthenticatedRequest): Promise<
   const padIndex = Number(match[2]) - 1;
   if (!Number.isSafeInteger(padIndex) || padIndex > 63) return null;
 
-  const { data: memberships, error: membershipError } = await req.supabase
+  const requestedOrganizationId = req.header('x-organization-id');
+  if (!requestedOrganizationId || !UUID_PATTERN.test(requestedOrganizationId)) return null;
+
+  const { data: membership, error: membershipError } = await req.supabase
     .from('organization_members')
     .select('organization_id')
     .eq('user_id', req.user.id)
-    .is('deleted_at', null);
-  if (membershipError || !memberships?.length) return null;
-
-  const requestedOrganizationId = req.header('x-organization-id');
-  if (requestedOrganizationId && !UUID_PATTERN.test(requestedOrganizationId)) return null;
-  const organizationIds = memberships
-    .map((membership) => membership.organization_id)
-    .filter((organizationId) => !requestedOrganizationId || organizationId === requestedOrganizationId);
-  if (!organizationIds.length) return null;
+    .eq('organization_id', requestedOrganizationId)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (membershipError || !membership || membership.organization_id !== requestedOrganizationId) return null;
 
   const { data: samples, error: sampleError } = await req.supabase
     .from('samples')
     .select('id, organization_id, storage_key, status')
-    .in('organization_id', organizationIds)
+    .eq('organization_id', membership.organization_id)
     .eq('kit_id', kitId)
     .eq('pad_index', padIndex)
     .eq('status', 'ready')
@@ -103,7 +101,7 @@ export async function authorizePresetSample(req: AuthenticatedRequest): Promise<
     .limit(2);
   if (sampleError || !samples || samples.length !== 1) return null;
   const sample = samples[0];
-  if (!organizationIds.includes(sample.organization_id) || !isSafeStorageKey(sample.storage_key)) return null;
+  if (sample.organization_id !== membership.organization_id || !isSafeStorageKey(sample.storage_key)) return null;
   return { sampleId: sample.id, storageKey: sample.storage_key };
 }
 

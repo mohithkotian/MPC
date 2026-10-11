@@ -13,22 +13,22 @@ Implemented locally on `fix/staging-preset-audio-404`; not deployed. Playback re
 
 ## Implementation
 
-In staging/production, a preset alias such as `kit1-pad11` is resolved by the request-scoped Supabase client: active organization memberships are loaded for the authenticated user, then the ready, non-deleted `samples` row is selected by kit and zero-based pad index within those organizations. An optional `x-organization-id` narrows that set and must be a UUID. Ambiguous, missing, malformed, inaccessible, or unsafe-key results fail closed as a non-enumerating not-found response. The trusted storage key is used only after membership and catalog checks.
+In staging/production, a preset alias such as `kit1-pad11` is resolved by the request-scoped Supabase client using `kit_id` and zero-based `pad_index`. The frontend obtains the active organization through the bearer-authenticated `/api/me/organizations` endpoint; because no organization switcher exists, the current application convention is the first organization returned by the server's alphabetical name ordering. The frontend passes that UUID as `x-organization-id`. The backend requires the header and independently verifies the caller's active membership in that exact organization before querying its ready, non-deleted sample row. Ambiguous, missing, malformed, inaccessible, or unsafe-key results fail closed as a non-enumerating not-found response. Storage is retrieved only by the database row's validated `storage_key` after membership and catalog checks.
 
 The manifest route and alias resolver use filesystem manifest data only in local/test environments. No service-role key, public bucket, sample binary, schema migration, or storage mutation is introduced.
 
 ## Regression coverage
 
-Added tests for a unique authorized catalog result, missing catalog row, cross-organization exclusion, missing private object, and a non-enumerating 404 response. Existing local manifest-backed successful stream test remains in place.
+Added tests for both preset aliases, staging/production catalog dispatch, missing organization context, a unique authorized catalog result, missing catalog row, cross-organization exclusion, missing private object, and a non-enumerating 404 response. Frontend tests verify the bearer-authenticated organization lookup, server-ordered active-org choice, header generation, and fail-closed empty membership behavior. Existing local manifest-backed successful stream test remains in place.
 
 ## Validation
 
-- `npm ci`: completed; 280 packages installed.
+- `npm ci`: completed; 279 packages installed from the lockfile.
 - `npm run lint`: passed (`tsc --noEmit`).
 - `npm run build:server`: passed.
-- Focused storage suite: 14/14 passed.
-- Full API test command could not complete because the desktop execution policy denied loopback socket connections (`EACCES`).
-- Frontend `npm run build` reached Vite but esbuild could not access the parent directory (`Access is denied`); frontend TypeScript lint passed.
+- Focused storage and organization-context suites: 20/20 passed, including both aliases, required organization context, missing rows/objects, and cross-organization denial.
+- The full API suite was attempted; local HTTP integration tests could not connect to loopback (`127.0.0.1`, `EACCES`).
+- Frontend `npm run build` reached Vite but esbuild could not access a parent directory outside the permitted workspace (`Access is denied`). Frontend TypeScript lint passed; Vite's runner fallback is incompatible with the existing `__dirname` config usage.
 - `npm audit --audit-level=high` reports seven existing dependency findings (five high, two moderate); see ADR 0010. No dependency changes were made.
 - Semgrep workflow was not run locally.
 
