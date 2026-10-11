@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: staging-deployment
@@ -16,7 +17,14 @@ concurrency:
 jobs:
   deploy:
     name: Deploy and verify staging
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.head_branch == 'master') &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.repository.full_name == github.repository
+      }}
     runs-on: ubuntu-latest
     environment: staging
     env:
@@ -27,10 +35,39 @@ jobs:
       STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
       STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
     steps:
-      - name: Checkout tested revision
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Validate trusted CI provenance
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          RUN_EVENT: ${{ github.event.workflow_run.event }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_REPOSITORY: ${{ github.event.workflow_run.repository.full_name }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          test "$RUN_EVENT" = "push"
+          test "$RUN_BRANCH" = "main" || test "$RUN_BRANCH" = "master"
+          test "$RUN_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$HEAD_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$RUN_CONCLUSION" = "success"
+          [[ "$RUN_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Download smoke artifact from the exact trusted CI run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          name: staging-smoke-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/staging-smoke
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify smoke artifact commit
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -eu
+          test "$(cat "$RUNNER_TEMP/staging-smoke/release-sha")" = "$EXPECTED_SHA"
+          test -s "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -64,4 +101,4 @@ jobs:
           exit 1
 
       - name: Run bounded staging smoke test
-        run: npm run test:staging-smoke
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"

@@ -18,7 +18,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: mpc_ci
-          POSTGRES_PASSWORD: mpc_ci
+          POSTGRES_PASSWORD: ${{ github.run_id }}
           POSTGRES_DB: mpc_ci
         ports:
           - 5432:5432
@@ -34,7 +34,7 @@ jobs:
       SERVER_ENCRYPTION_KEY: ci-encryption-key
       ALLOWED_ORIGINS: http://localhost:5173
       DATABASE_SSL: disable
-      TEST_DATABASE_URL: postgresql://mpc_ci:mpc_ci@127.0.0.1:5432/mpc_ci
+      TEST_DATABASE_URL: postgresql://mpc_ci:${{ github.run_id }}@127.0.0.1:5432/mpc_ci
       VITE_SUPABASE_URL: https://ci.supabase.invalid
       VITE_SUPABASE_ANON_KEY: ci-anon-key
       VITE_API_BASE: http://127.0.0.1:3000
@@ -70,6 +70,22 @@ jobs:
 
       - name: Disposable database and RLS tests
         run: npm run db:test
+
+      - name: Package trusted staging smoke artifact
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
+        run: |
+          set -eu
+          mkdir -p .ci-artifacts
+          cp scripts/staging-smoke.mjs .ci-artifacts/staging-smoke.mjs
+          printf '%s\n' "$GITHUB_SHA" > .ci-artifacts/release-sha
+
+      - name: Upload trusted staging smoke artifact
+        if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: staging-smoke-${{ github.sha }}
+          path: .ci-artifacts
+          if-no-files-found: error
 
       - name: High-severity dependency audit
         run: npm audit --audit-level=high
