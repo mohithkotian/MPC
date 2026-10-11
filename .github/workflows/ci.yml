@@ -65,6 +65,9 @@ jobs:
       - name: Authentication tests
         run: npm run test:auth
 
+      - name: Staging smoke authentication tests
+        run: npm run test:staging-smoke-auth
+
       - name: API, project, storage, configuration, and security tests
         run: npm run test:api
 
@@ -77,6 +80,7 @@ jobs:
           set -eu
           mkdir -p .ci-artifacts
           cp scripts/staging-smoke.mjs .ci-artifacts/staging-smoke.mjs
+          cp scripts/staging-smoke-auth.mjs .ci-artifacts/staging-smoke-auth.mjs
           printf '%s\n' "$GITHUB_SHA" > .ci-artifacts/release-sha
 
       - name: Upload trusted staging smoke artifact

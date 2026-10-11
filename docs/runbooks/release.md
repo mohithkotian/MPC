@@ -34,14 +34,17 @@ Expected result: every command exits zero. A blocked provider, audit, or Semgrep
 6. Run the smoke test with dedicated staging fixtures:
 
    ```text
-   STAGING_BASE_URL=https://<staging-backend>
-   STAGING_ACCESS_TOKEN=<temporary-staging-token>
+   STAGING_BACKEND_URL=https://<staging-backend>
+   STAGING_SUPABASE_URL=https://<staging-project>.supabase.co
+   STAGING_SUPABASE_ANON_KEY=<staging-anon-or-publishable-key>
+   STAGING_TEST_USER_EMAIL=<dedicated-staging-test-account>
+   STAGING_TEST_USER_PASSWORD=<dedicated-staging-password>
    STAGING_ORGANIZATION_ID=<staging-org>
    STAGING_SAMPLE_ID=<staging-sample>
    npm run test:staging-smoke
    ```
 
-   Expected result: `PASS` for liveness, unauthenticated rejection, authenticated session, tenant-scoped project access, and authorized private audio. Missing fixtures produce `BLOCKED` and exit code 2.
+   Use a dedicated staging-only account and load these values from a secure store; do not commit them or paste them into logs/chat. The script obtains and masks a short-lived access token at runtime and never uses a service-role key. Expected result: `PASS` for liveness, unauthenticated rejection, verified test-account identity and organization membership, designated sample access, and project lifecycle. Missing configuration produces `BLOCKED` and exit code 2.
 7. Verify a uniquely named staging project can be created, read, updated, and read again after the update. Delete only that fixture through the supported API.
 8. Verify sanitized logs contain the returned `X-Request-Id` and contain no bearer token, cookie, raw authorization header, or private storage key.
 9. Review Render, Supabase, and Upstash provider signals. Record what was checked and what is unavailable.
