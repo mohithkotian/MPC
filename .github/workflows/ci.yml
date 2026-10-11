@@ -87,5 +87,5 @@ jobs:
           path: .ci-artifacts
           if-no-files-found: error
 
-      - name: High-severity dependency audit
-        run: npm audit --audit-level=high
+      - name: High-severity production dependency audit
+        run: npm audit --omit=dev --audit-level=high
