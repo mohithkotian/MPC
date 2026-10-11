@@ -27,13 +27,6 @@ jobs:
       }}
     runs-on: ubuntu-latest
     environment: staging
-    env:
-      STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
-      STAGING_ACCESS_TOKEN: ${{ secrets.STAGING_ACCESS_TOKEN }}
-      STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
-      STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
-      STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
-      STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
     steps:
       - name: Validate trusted CI provenance
         env:
@@ -68,11 +61,47 @@ jobs:
           set -eu
           test "$(cat "$RUNNER_TEMP/staging-smoke/release-sha")" = "$EXPECTED_SHA"
           test -s "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"
+          test -s "$RUNNER_TEMP/staging-smoke/staging-smoke-auth.mjs"
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.22.0
+
+      - name: Validate staging configuration before deployment
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs" --validate-config
+
+      - name: Verify staging account and fixtures before deployment
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+        run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs" --preflight
+
+      - name: Validate both Render staging deploy hooks
+        env:
+          RENDER_STAGING_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_BACKEND_DEPLOY_HOOK }}
+          RENDER_STAGING_FRONTEND_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
+        run: |
+          set -eu
+          test -n "$RENDER_STAGING_BACKEND_DEPLOY_HOOK"
+          test -n "$RENDER_STAGING_FRONTEND_DEPLOY_HOOK"
 
       - name: Trigger backend Render staging deploy
         env:
@@ -101,4 +130,14 @@ jobs:
           exit 1
 
       - name: Run bounded staging smoke test
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_EMAIL: ${{ secrets.STAGING_TEST_USER_EMAIL }}
+          STAGING_TEST_USER_PASSWORD: ${{ secrets.STAGING_TEST_USER_PASSWORD }}
+          STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+          STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+          STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+          STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
         run: node "$RUNNER_TEMP/staging-smoke/staging-smoke.mjs"

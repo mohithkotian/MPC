@@ -46,7 +46,9 @@ The exact expression is used for both `POSTGRES_PASSWORD` and `TEST_DATABASE_URL
 
 ## Historical handling
 
-The original `mpc_ci` literal remains in commit `570d6b8` because Git history is not being rewritten. Since it is confirmed synthetic test data and was never a production credential, history rewriting or credential rotation is not warranted for this finding. After the remediation commit is pushed and GitGuardian rescans the PR, mark both occurrences as resolved/false positive according to the repository’s GitGuardian workflow, retaining this evidence.
+The phase-6 branch history is being rewritten so the original workflow-introduction commit no longer contains the static test password. The replacement commit keeps the disposable PostgreSQL username/database unchanged and uses a unique per-run password; subsequent phase-6 changes are replayed on top. The original commit remains identified above for audit context, but is no longer part of the rewritten phase-6 branch ancestry once that branch update is published. GitHub may retain unreachable objects or copies may remain in existing clones/forks.
+
+The reported value was confirmed to be synthetic test data and was never a production credential, so no credential rotation is warranted based on current evidence. After the rewritten branch is pushed and GitGuardian rescans the PR, verify that both occurrences clear and retain this evidence.
 
 If later evidence shows that `mpc_ci` was reused as a real credential anywhere outside these disposable services, stop publication immediately, rotate the credential at its owning provider, inspect access logs, and reassess history cleanup. No such evidence is currently present.
 

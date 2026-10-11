@@ -34,7 +34,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: mpc_ci
-          POSTGRES_PASSWORD: ${{ github.run_id }}
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: mpc_ci
         ports:
           - 5432:5432
@@ -68,7 +68,7 @@ jobs:
 
       - name: Run release verification
         env:
-          TEST_DATABASE_URL: postgresql://mpc_ci:${{ github.run_id }}@127.0.0.1:5432/mpc_ci
+          TEST_DATABASE_URL: postgresql://mpc_ci:ci-${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/mpc_ci
         run: |
           npm run lint
           npm run build

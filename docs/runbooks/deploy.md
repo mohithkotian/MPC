@@ -20,7 +20,8 @@ The workflows are configuration, not deployment evidence. No staging or producti
 4. authentication tests;
 5. API, project, storage, configuration, and security tests;
 6. disposable PostgreSQL migration/RLS tests;
-7. `npm audit --audit-level=high`.
+7. staging smoke authentication regression tests;
+8. `npm audit --omit=dev --audit-level=high`.
 
 The existing Semgrep workflow remains a separate required security check. Repository administrators must make both the CI workflow and Semgrep workflow required status checks before merging or deploying.
 
@@ -32,11 +33,13 @@ The locked `@supabase/auth-js@2.117.3` dependency requires Node.js `>=22.0.0`. C
 
 ## Staging deployment
 
-`deploy-staging.yml` runs only after a successful CI workflow on `main` or `master`. It uses the protected GitHub `staging` environment, triggers the separate backend and frontend Render deploy hooks, waits for `GET /api/ready`, and runs `npm run test:staging-smoke`.
+`deploy-staging.yml` runs only after a successful CI workflow on a same-repository push to `main` or `master`. It uses the GitHub `staging` environment, validates all required settings before calling either Render deploy hook, waits for `GET /api/ready`, and runs the smoke script from the exact-SHA artifact. The `staging` environment must remain restricted to the `main` branch; do not put staging secrets in repository-level secrets or variables.
 
-The smoke test requires a dedicated staging test account, organization, ready sample fixture, and access token. It verifies liveness, readiness, unauthenticated rejection, authenticated session, missing-sample 404 behavior, authorized private audio retrieval with at most 64 KiB consumed, and create/list/update/delete project behavior. Cleanup is scoped to the uniquely named project created by the smoke test.
+Before use, create a dedicated Supabase Auth test account in the staging Supabase project. Use a non-production mailbox/password, verify the account, and grant it membership with project-write permission in the configured staging organization. Ensure `STAGING_SAMPLE_ID` identifies a ready private sample in that same organization and the test account is authorized to stream it. Do not grant service-role access or reuse a human/production account.
 
-A missing hook, URL, token, organization, or sample ID fails the workflow. Critical checks are never silently skipped.
+At runtime, the smoke script signs in with the test account through Supabase Auth password sign-in using the staging anon/publishable key. It masks the returned access token immediately, keeps it only in process memory, never logs or persists it, and does not request or use a service-role key or refresh token. It verifies the Supabase user identity, the backend-verified identity, membership in `STAGING_ORGANIZATION_ID`, inclusion of `STAGING_SAMPLE_ID` in that organization's sample manifest, and successful authorized sample streaming. It also verifies liveness, readiness, unauthenticated rejection, missing-sample 404 behavior, and create/list/update/delete project behavior. Cleanup is scoped to the uniquely named project created by the smoke test.
+
+A missing hook, URL, anon key, test-account credential, organization, or sample ID fails before either Render hook is called. The read-only pre-deployment check also authenticates the test account and verifies its backend identity, organization membership, sample-manifest membership, and sample streaming access. Invalid credentials, an expired session, missing organization membership, or inaccessible sample therefore blocks deployment. The post-deployment smoke test repeats these checks and runs the project lifecycle checks. Critical checks are never silently skipped.
 
 ## Production deployment and approval
 
@@ -46,11 +49,13 @@ Production is not deployed by this task. Environment protection is not enforceab
 
 ## GitHub configuration
 
-### Repository variables
+### Staging environment variables
+
+Add these as variables on the GitHub `staging` environment:
 
 - `STAGING_ORGANIZATION_ID`: dedicated staging smoke-test organization UUID.
-- `STAGING_SAMPLE_ID`: dedicated ready staging sample UUID.
-- `STAGING_MISSING_SAMPLE_ID`: optional dedicated absent UUID; otherwise the script generates one.
+- `STAGING_SAMPLE_ID`: ready private sample UUID in that organization.
+- `STAGING_MISSING_SAMPLE_ID`: optional absent UUID; otherwise the script generates one.
 - `STAGING_SMOKE_PROJECT`: optional name prefix.
 
 ### Staging environment secrets
@@ -58,7 +63,10 @@ Production is not deployed by this task. Environment protection is not enforceab
 - `RENDER_STAGING_BACKEND_DEPLOY_HOOK`
 - `RENDER_STAGING_FRONTEND_DEPLOY_HOOK`
 - `STAGING_BACKEND_URL`
-- `STAGING_ACCESS_TOKEN`
+- `STAGING_SUPABASE_URL`
+- `STAGING_SUPABASE_ANON_KEY`: anon JWT key (`role: anon`) or a publishable key; never a service-role/secret key.
+- `STAGING_TEST_USER_EMAIL`
+- `STAGING_TEST_USER_PASSWORD`
 
 ### Production environment secrets
 
@@ -66,7 +74,7 @@ Production is not deployed by this task. Environment protection is not enforceab
 - `RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK`
 - `PRODUCTION_BACKEND_URL`
 
-Render hook URLs and tokens must remain environment secrets. They must never be echoed, placed in repository variables, or committed to source.
+Render hook URLs, Supabase credentials, Supabase URL/key, and test-account credentials must remain secrets on the `staging` environment. They must never be echoed, placed in repository variables, or committed to source. The previous static `STAGING_ACCESS_TOKEN` secret is obsolete and must be deleted if it exists. The smoke workflow does not use a long-lived access token.
 
 ## Render service contract
 
