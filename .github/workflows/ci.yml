@@ -78,17 +78,17 @@ jobs:
         if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
         run: |
           set -eu
-          mkdir -p .ci-artifacts
-          cp scripts/staging-smoke.mjs .ci-artifacts/staging-smoke.mjs
-          cp scripts/staging-smoke-auth.mjs .ci-artifacts/staging-smoke-auth.mjs
-          printf '%s\n' "$GITHUB_SHA" > .ci-artifacts/release-sha
+          mkdir -p ci-artifacts
+          cp scripts/staging-smoke.mjs ci-artifacts/staging-smoke.mjs
+          cp scripts/staging-smoke-auth.mjs ci-artifacts/staging-smoke-auth.mjs
+          printf '%s\n' "$GITHUB_SHA" > ci-artifacts/release-sha
 
       - name: Upload trusted staging smoke artifact
         if: ${{ github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: staging-smoke-${{ github.sha }}
-          path: .ci-artifacts
+          path: ci-artifacts
           if-no-files-found: error
 
       - name: High-severity production dependency audit
