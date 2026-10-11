@@ -17,6 +17,8 @@
     "db:test": "tsx server/db/tests/runDatabaseTests.ts",
     "typecheck:server": "tsc -p tsconfig.server.json",
     "test:auth": "node --import tsx --test server/tests/auth.test.ts",
+    "test:project-api": "node --import tsx --import ./server/tests/test-env.ts --test --test-concurrency=1 server/tests/projects.api.test.ts",
+    "test:staging-smoke": "node scripts/staging-smoke.mjs",
     "test:api": "node --import tsx --import ./server/tests/test-env.ts --test --test-concurrency=1 server/tests/api.test.ts server/tests/storage.test.ts server/tests/projects.api.test.ts server/tests/projects.validation.test.ts",
     "lint": "tsc --noEmit"
   },

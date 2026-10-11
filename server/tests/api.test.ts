@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 import test, { after, before } from 'node:test';
 
 process.env.NODE_ENV = 'test';
 process.env.SUPABASE_URL = 'https://test.supabase.invalid';
 process.env.SUPABASE_ANON_KEY = 'test-anon-key';
 process.env.SERVER_ENCRYPTION_KEY = 'test-encryption-key';
+const temporarySamplesDirectory = await mkdtemp(path.join(os.tmpdir(), 'mpc-api-test-'));
+await writeFile(path.join(temporarySamplesDirectory, '59f30c7d-13df-424f-b93e-a8b41184cef3.mp3'), Buffer.from('synthetic test audio'));
+process.env.MPC_TEST_SAMPLES_DIR = temporarySamplesDirectory;
 const originalFetch = globalThis.fetch;
 const userId = '22222222-2222-4222-8222-222222222222';
 const organizationId = '33333333-3333-4333-8333-333333333333';
@@ -23,11 +29,10 @@ before(() => {
     return json({});
   };
 });
-after(() => { globalThis.fetch = originalFetch; });
 const { app } = await import('../index');
 const server = app.listen(0);
 const address = server.address() as { port: number };
-function request(path: string, headers: Record<string, string> = {}): Promise<{ status: number; body: any }> {
+function request(path: string, headers: Record<string, string> = {}): Promise<{ status: number; body: any; responseHeaders: http.IncomingHttpHeaders }> {
   return new Promise((resolve, reject) => {
     const req = http.request({ port: address.port, path, method: 'GET', headers }, (res) => {
       let data = '';
@@ -35,7 +40,7 @@ function request(path: string, headers: Record<string, string> = {}): Promise<{ 
       res.on('end', () => {
         let parsed: any = null;
         try { parsed = data ? JSON.parse(data) : null; } catch { parsed = data; }
-        resolve({ status: res.statusCode ?? 0, body: parsed });
+        resolve({ status: res.statusCode ?? 0, body: parsed, responseHeaders: res.headers });
       });
     });
     req.on('error', reject);
@@ -44,10 +49,21 @@ function request(path: string, headers: Record<string, string> = {}): Promise<{ 
 }
 
 test('protected session rejects missing bearer token', async () => { const result = await request('/api/auth/session'); assert.equal(result.status, 401); });
+test('request IDs are returned and valid caller IDs are propagated', async () => {
+  const result = await request('/api/health', { 'X-Request-Id': 'test-request-123' });
+  assert.equal(result.status, 200);
+  assert.equal(result.responseHeaders['x-request-id'], 'test-request-123');
+});
+test('readiness endpoint reports process readiness', async () => { const result = await request('/api/ready'); assert.equal(result.status, 200); assert.equal(result.body.status, 'ready'); });
 test('session returns the provider-verified identity', async () => { const result = await request('/api/auth/session', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.user.id, userId); assert.equal(result.body.user.email, 'owner@example.test'); });
 test('me ignores a client-supplied user id and returns the verified profile', async () => { const result = await request('/api/me?user_id=99999999-9999-4999-8999-999999999999', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.id, userId); });
 test('organizations returns only the request-scoped user membership', async () => { const result = await request('/api/me/organizations', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.equal(result.body.organizations[0].id, organizationId); });
 test('audio denies an unauthorized or cross-organization sample before file access', async () => { const result = await request(`/api/audio/stream/${sampleId}`, { Authorization: 'Bearer valid-token', 'x-organization-id': organizationId }); assert.equal(result.status, 404); });
 test('audio allows streaming preset kit samples for authenticated users', async () => { const result = await request('/api/audio/stream/kit1-pad1', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); });
 test('manifest returns preset sample catalog when no organization header is provided', async () => { const result = await request('/api/audio/manifest', { Authorization: 'Bearer valid-token' }); assert.equal(result.status, 200); assert.ok(Object.keys(result.body).length > 0); });
-after(() => { server.close(); });
+after(async () => {
+  globalThis.fetch = originalFetch;
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await rm(temporarySamplesDirectory, { recursive: true, force: true });
+  delete process.env.MPC_TEST_SAMPLES_DIR;
+});

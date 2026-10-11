@@ -26,7 +26,8 @@ if (STORAGE_PROVIDER === 'supabase' && !SUPABASE_STORAGE_BUCKET) {
   throw new Error('FATAL: SUPABASE_STORAGE_BUCKET must be provided when STORAGE_PROVIDER=supabase');
 }
 export const STORAGE_DIR = path.join(process.cwd(), 'server', 'storage');
-export const SAMPLES_DIR = path.join(STORAGE_DIR, 'samples');
+const testSamplesDirectory = process.env.NODE_ENV === 'test' ? process.env.MPC_TEST_SAMPLES_DIR?.trim() : undefined;
+export const SAMPLES_DIR = testSamplesDirectory ? path.resolve(testSamplesDirectory) : path.join(STORAGE_DIR, 'samples');
 export const MANIFEST_PATH = path.join(STORAGE_DIR, 'manifest.json');
 const configuredOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
 if (isProduction && (!configuredOrigins || configuredOrigins.length === 0)) throw new Error('FATAL: ALLOWED_ORIGINS must contain at least one origin in production');

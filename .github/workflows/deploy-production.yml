@@ -1,0 +1,111 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Commit SHA to verify and deploy
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  verify-release:
+    name: Verify release before production approval
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      SUPABASE_URL: https://ci.supabase.invalid
+      SUPABASE_ANON_KEY: ci-anon-key
+      SERVER_ENCRYPTION_KEY: ci-encryption-key
+      ALLOWED_ORIGINS: http://localhost:5173
+      DATABASE_SSL: disable
+      VITE_SUPABASE_URL: https://ci.supabase.invalid
+      VITE_SUPABASE_ANON_KEY: ci-anon-key
+      VITE_API_BASE: http://127.0.0.1:3000
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mpc_ci
+          POSTGRES_PASSWORD: mpc_ci
+          POSTGRES_DB: mpc_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mpc_ci -d mpc_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout requested release
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.release_sha }}
+
+      - name: Require successful CI and Semgrep for release SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          test "$(gh run list --workflow ci.yml --commit "$RELEASE_SHA" --status completed --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')" -gt 0
+          test "$(gh run list --workflow semgrep.yml --commit "$RELEASE_SHA" --status completed --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')" -gt 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run release verification
+        env:
+          TEST_DATABASE_URL: postgresql://mpc_ci:mpc_ci@127.0.0.1:5432/mpc_ci
+        run: |
+          npm run lint
+          npm run build
+          npm run typecheck:server
+          npm run build:server
+          npm run test:auth
+          npm run test:api
+          npm run db:test
+          npm audit --audit-level=high
+
+  deploy:
+    name: Deploy approved production release
+    needs: verify-release
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger backend Render production deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_BACKEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Trigger frontend Render production deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_PRODUCTION_FRONTEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Verify production backend readiness
+        env:
+          BASE_URL: ${{ secrets.PRODUCTION_BACKEND_URL }}
+        run: |
+          test -n "$BASE_URL"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 10 "$BASE_URL/api/ready" >/dev/null; then exit 0; fi
+            sleep 10
+          done
+          echo "Production backend did not become ready in the allotted time" >&2
+          exit 1

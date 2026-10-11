@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Install, test, audit, and build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mpc_ci
+          POSTGRES_PASSWORD: mpc_ci
+          POSTGRES_DB: mpc_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mpc_ci -d mpc_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      SUPABASE_URL: https://ci.supabase.invalid
+      SUPABASE_ANON_KEY: ci-anon-key
+      SERVER_ENCRYPTION_KEY: ci-encryption-key
+      ALLOWED_ORIGINS: http://localhost:5173
+      DATABASE_SSL: disable
+      TEST_DATABASE_URL: postgresql://mpc_ci:mpc_ci@127.0.0.1:5432/mpc_ci
+      VITE_SUPABASE_URL: https://ci.supabase.invalid
+      VITE_SUPABASE_ANON_KEY: ci-anon-key
+      VITE_API_BASE: http://127.0.0.1:3000
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint and frontend typecheck
+        run: npm run lint
+
+      - name: Frontend build
+        run: npm run build
+
+      - name: Backend typecheck
+        run: npm run typecheck:server
+
+      - name: Backend build
+        run: npm run build:server
+
+      - name: Authentication tests
+        run: npm run test:auth
+
+      - name: API, project, storage, configuration, and security tests
+        run: npm run test:api
+
+      - name: Disposable database and RLS tests
+        run: npm run db:test
+
+      - name: High-severity dependency audit
+        run: npm audit --audit-level=high
