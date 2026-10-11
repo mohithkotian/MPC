@@ -1,0 +1,67 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify staging
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      STAGING_BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+      STAGING_ACCESS_TOKEN: ${{ secrets.STAGING_ACCESS_TOKEN }}
+      STAGING_ORGANIZATION_ID: ${{ vars.STAGING_ORGANIZATION_ID }}
+      STAGING_SAMPLE_ID: ${{ vars.STAGING_SAMPLE_ID }}
+      STAGING_MISSING_SAMPLE_ID: ${{ vars.STAGING_MISSING_SAMPLE_ID }}
+      STAGING_SMOKE_PROJECT: ${{ vars.STAGING_SMOKE_PROJECT }}
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+
+      - name: Trigger backend Render staging deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_BACKEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Trigger frontend Render staging deploy
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK"
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+
+      - name: Wait for staging backend readiness
+        env:
+          BASE_URL: ${{ secrets.STAGING_BACKEND_URL }}
+        run: |
+          test -n "$BASE_URL"
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 10 "$BASE_URL/api/ready" >/dev/null; then exit 0; fi
+            sleep 10
+          done
+          echo "Staging backend did not become ready in the allotted time" >&2
+          exit 1
+
+      - name: Run bounded staging smoke test
+        run: npm run test:staging-smoke

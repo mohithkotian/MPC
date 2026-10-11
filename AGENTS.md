@@ -53,3 +53,6 @@ Use a modular monolith first. Keep route handlers thin and move identity/session
 
 ## Key project risks currently known
 See `docs/production-readiness-plan.md`. Do not describe the app as production-ready until the release-blocking findings and verification gates there are closed.
+
+## Phase 5.7 status
+The local Phase 5.7 implementation adds request-ID propagation, structured redacted request logs, bounded diagnostic counters, focused observability tests, a staging smoke-test entry point, and release/incident/backup/rollback runbooks. Phase 5.6 CI/staging/production workflows and ADRs 0006/0007 were recovered from retained local worktree history; the 26 tracked sample binaries were removed from the proposed working-tree diff without rewriting Git history. Provider alert configuration, staging end-to-end verification, an isolated database restore drill, a staging rollback rehearsal, and historical sample licensing/exposure review remain external gates and must be recorded as evidence before production readiness is claimed. See `docs/phase-5-7-readiness.md` and `docs/decisions/0008-phase-5-7-observability-and-operations.md`.

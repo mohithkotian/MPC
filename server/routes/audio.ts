@@ -5,6 +5,7 @@ import { noCacheHeader, antiHotlink, audioRateLimiter, checkBlocklist } from '..
 import { MANIFEST_PATH } from '../config';
 import { createSampleStorage } from '../storage';
 import { isSafeStorageKey, StorageProviderError, type SampleStorage } from '../storage/SampleStorage';
+import { incrementMetric, log, requestId } from '../observability';
 
 interface SampleManifestEntry {
   id: string;
@@ -106,16 +107,23 @@ export function createAudioRouter(storageFactory: StorageFactory = (req) => crea
     try {
       authorized = await authorizeThenCreateStorage(req, storageFactory);
     } catch (error) {
+      log('error', 'audio.authorization_dependency_failed', { requestId: requestId(req), route: req.path, error: error instanceof Error ? error.message : 'unknown authorization error' });
       if (error instanceof StorageProviderError) { res.status(502).json({ error: 'Unable to retrieve sample' }); return; }
       res.status(500).json({ error: 'Unable to retrieve sample' });
       return;
     }
-    if (!authorized) { res.status(404).json({ error: 'Sample not found' }); return; }
+    if (!authorized) {
+      incrementMetric('audio_authorization_rejections_total');
+      log('warn', 'audio.authorization_rejected', { requestId: requestId(req), route: req.path });
+      res.status(404).json({ error: 'Sample not found' });
+      return;
+    }
 
     let storedObject;
     try {
       storedObject = await authorized.storage.get(authorized.sample.storageKey);
     } catch (error) {
+      log('error', 'audio.storage_get_failed', { requestId: requestId(req), route: req.path, error: error instanceof Error ? error.message : 'unknown storage error' });
       if (error instanceof StorageProviderError) {
         res.status(502).json({ error: 'Unable to retrieve sample' });
         return;

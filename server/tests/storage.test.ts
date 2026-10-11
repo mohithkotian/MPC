@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import test from 'node:test';
+import os from 'node:os';
+import path from 'node:path';
 import type { AuthenticatedRequest } from '../routes/auth';
 import { authorizeTenantSample, authorizeThenCreateStorage } from '../routes/audio';
 import { LocalSampleStorage, StorageProviderError, SupabaseStorage, isSafeStorageKey, type SampleStorage } from '../storage/SampleStorage';
@@ -82,11 +85,17 @@ test('storage is never created before authorization succeeds', async () => {
 });
 
 test('local storage returns an existing development sample', async () => {
-  const local = new LocalSampleStorage('server/storage/samples');
-  const object = await local.get(storageKey);
-  assert.ok(object);
-  assert.equal(object.contentType, 'audio/mpeg');
-  object.body.destroy();
+  const samplesDirectory = await mkdtemp(path.join(os.tmpdir(), 'mpc-storage-test-'));
+  try {
+    await writeFile(path.join(samplesDirectory, storageKey), Buffer.from('synthetic test audio'));
+    const local = new LocalSampleStorage(samplesDirectory);
+    const object = await local.get(storageKey);
+    assert.ok(object);
+    assert.equal(object.contentType, 'audio/mpeg');
+    object.body.destroy();
+  } finally {
+    await rm(samplesDirectory, { recursive: true, force: true });
+  }
 });
 
 test('Supabase Storage provider failures are controlled', async () => {
