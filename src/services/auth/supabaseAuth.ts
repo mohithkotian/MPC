@@ -1,10 +1,11 @@
-﻿import { createClient, type AuthChangeEvent, type Session, type User, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type AuthChangeEvent, type Session, type User, type SupabaseClient } from '@supabase/supabase-js';
 
 let client: SupabaseClient | null = null;
 function getClient(): SupabaseClient {
   if (client) return client;
-  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const url = env?.VITE_SUPABASE_URL?.trim();
+  const anonKey = env?.VITE_SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) throw new Error('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are required for browser authentication.');
   client = createClient(url, anonKey, { auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true } });
   return client;
