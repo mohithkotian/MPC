@@ -26,13 +26,28 @@ export class StorageProviderError extends Error {
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
 const SAFE_FILENAME = new RegExp(`^${UUID}\\.mp3$`, 'i');
-const TENANT_OBJECT_KEY = new RegExp(`^organizations/${UUID}/samples/${UUID}\\.mp3$`, 'i');
+const TENANT_OBJECT_KEY = new RegExp(`^organizations/(${UUID})/samples/${UUID}\\.mp3$`, 'i');
 const PRESET_OBJECT_KEY = new RegExp(`^(?:presets/)?${UUID}\\.mp3$`, 'i');
+const ORGANIZATION_PACK_OBJECT_KEY = new RegExp(`^organizations/(${UUID})/samples/(father|runaway)/([A-Za-z0-9][A-Za-z0-9._-]*\\.mp3)$`, 'i');
+const VALID_UUID = new RegExp(`^${UUID}$`, 'i');
 const SUPPORTED_MP3_TYPES = new Set(['audio/mpeg', 'audio/mp3']);
 
 export function isSafeStorageKey(storageKey: string): boolean {
   if (!storageKey || storageKey.includes('..') || storageKey.includes('\\0') || path.isAbsolute(storageKey)) return false;
-  return SAFE_FILENAME.test(storageKey) || TENANT_OBJECT_KEY.test(storageKey) || PRESET_OBJECT_KEY.test(storageKey);
+  return SAFE_FILENAME.test(storageKey) || TENANT_OBJECT_KEY.test(storageKey) || PRESET_OBJECT_KEY.test(storageKey) || ORGANIZATION_PACK_OBJECT_KEY.test(storageKey);
+}
+
+export function isSafeOrganizationSampleKey(storageKey: string, organizationId: string, kitId?: string): boolean {
+  if (!VALID_UUID.test(organizationId) || !isSafeStorageKey(storageKey)) return false;
+  const packMatch = ORGANIZATION_PACK_OBJECT_KEY.exec(storageKey);
+  if (packMatch) {
+    const expectedFolder = kitId === 'kit1' ? 'father' : kitId === 'kit2' ? 'runaway' : undefined;
+    return packMatch[1].toLowerCase() === organizationId.toLowerCase()
+      && (!kitId || (expectedFolder !== undefined && packMatch[2].toLowerCase() === expectedFolder));
+  }
+
+  const tenantMatch = TENANT_OBJECT_KEY.exec(storageKey);
+  return !tenantMatch || tenantMatch[1].toLowerCase() === organizationId.toLowerCase();
 }
 
 export class LocalSampleStorage implements SampleStorage {

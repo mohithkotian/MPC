@@ -4,7 +4,7 @@ import { requireAuth, type AuthenticatedRequest } from './auth';
 import { noCacheHeader, antiHotlink, audioRateLimiter, checkBlocklist } from '../middleware/security';
 import { MANIFEST_PATH } from '../config';
 import { createSampleStorage } from '../storage';
-import { isSafeStorageKey, StorageProviderError, type SampleStorage } from '../storage/SampleStorage';
+import { isSafeOrganizationSampleKey, isSafeStorageKey, StorageProviderError, type SampleStorage } from '../storage/SampleStorage';
 import { incrementMetric, log, requestId } from '../observability';
 
 interface SampleManifestEntry {
@@ -68,6 +68,7 @@ export async function authorizeTenantSample(req: AuthenticatedRequest): Promise<
     .is('deleted_at', null)
     .maybeSingle();
   if (membershipError || !membership) return null;
+  if (!isSafeOrganizationSampleKey(data.storage_key, data.organization_id)) return null;
   return { storageKey: data.storage_key };
 }
 
@@ -101,7 +102,7 @@ export async function authorizePresetSample(req: AuthenticatedRequest): Promise<
     .limit(2);
   if (sampleError || !samples || samples.length !== 1) return null;
   const sample = samples[0];
-  if (sample.organization_id !== membership.organization_id || !isSafeStorageKey(sample.storage_key)) return null;
+  if (sample.organization_id !== membership.organization_id || !isSafeOrganizationSampleKey(sample.storage_key, membership.organization_id, kitId)) return null;
   return { sampleId: sample.id, storageKey: sample.storage_key };
 }
 
