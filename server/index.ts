@@ -3,7 +3,6 @@ import cors from 'cors';
 import { PORT, ALLOWED_ORIGINS } from './config';
 import { authRouter, meRouter } from './routes/auth';
 import { audioRouter } from './routes/audio';
-import { communityRouter } from './routes/community';
 import { projectsRouter } from './routes/projects';
 import { log, requestId, requestIdMiddleware, requestLoggingMiddleware } from './observability';
 
@@ -17,7 +16,6 @@ app.use('/api/auth', authRouter);
 app.use('/api/me', meRouter);
 app.use('/api/audio', audioRouter);
 app.use('/api/projects', projectsRouter);
-app.use('/api/community', communityRouter);
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Pulse MPC Secure Audio Delivery' }));
 app.get('/api/ready', (_req, res) => res.json({ status: 'ready', service: 'Pulse MPC Secure Audio Delivery' }));
 
