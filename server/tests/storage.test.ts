@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import test from 'node:test';
 import os from 'node:os';
 import path from 'node:path';
 import type { AuthenticatedRequest } from '../routes/auth';
 import { authorizePresetSample, authorizeTenantSample, authorizeThenCreateStorage } from '../routes/audio';
-import { LocalSampleStorage, StorageProviderError, SupabaseStorage, isSafeStorageKey, type SampleStorage } from '../storage/SampleStorage';
+import { LocalSampleStorage, StorageProviderError, SupabaseStorage, isSafeOrganizationSampleKey, isSafeStorageKey, type SampleStorage } from '../storage/SampleStorage';
 
 const userId = '22222222-2222-4222-8222-222222222222';
 const organizationId = '33333333-3333-4333-8333-333333333333';
@@ -79,6 +79,14 @@ test('cross-organization sample is denied by the membership check', async () => 
   const result = await authorizeTenantSample(requestWithDatabase(
     { organization_id: organizationId, storage_key: storageKey, status: 'ready' },
     null,
+  ));
+  assert.equal(result, null);
+});
+
+test('tenant sample cannot use a storage key embedded for another organization', async () => {
+  const result = await authorizeTenantSample(requestWithDatabase(
+    { organization_id: organizationId, storage_key: `organizations/${otherOrganizationId}/samples/${sampleId}.mp3`, status: 'ready' },
+    { organization_id: organizationId, user_id: userId, deleted_at: null },
   ));
   assert.equal(result, null);
 });
@@ -173,6 +181,62 @@ test('invalid and traversal storage keys are rejected', () => {
   assert.equal(isSafeStorageKey('not-a-sample.mp3'), false);
 });
 
+test('organization-scoped named preset object resolves for its matching kit and pad', async () => {
+  const fatherKey = `organizations/${organizationId}/samples/father/guitar.mp3`;
+  assert.equal(isSafeStorageKey(fatherKey), true);
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: fatherKey, status: 'ready', kit_id: 'kit1', pad_index: 10 }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+    organizationId,
+    'kit1-pad11',
+  ));
+  assert.deepEqual(result, { sampleId, storageKey: fatherKey });
+});
+
+test('RUNAWAY named preset object resolves its first pad from pad index zero', async () => {
+  const runawayKey = `organizations/${organizationId}/samples/runaway/piano1.mp3`;
+  assert.equal(isSafeStorageKey(runawayKey), true);
+  const result = await authorizePresetSample(presetRequestWithDatabase(
+    [{ id: sampleId, organization_id: organizationId, storage_key: runawayKey, status: 'ready', kit_id: 'kit2', pad_index: 0 }],
+    [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+    organizationId,
+    'kit2-pad1',
+  ));
+  assert.deepEqual(result, { sampleId, storageKey: runawayKey });
+});
+
+test('organization sample keys are bound to the catalog tenant and matching kit folder', () => {
+  const fatherKey = `organizations/${organizationId}/samples/father/guitar.mp3`;
+  const runawayKey = `organizations/${organizationId}/samples/runaway/piano1.mp3`;
+  assert.equal(isSafeOrganizationSampleKey(fatherKey, organizationId, 'kit1'), true);
+  assert.equal(isSafeOrganizationSampleKey(fatherKey, otherOrganizationId, 'kit1'), false);
+  assert.equal(isSafeOrganizationSampleKey(fatherKey, organizationId, 'kit2'), false);
+  assert.equal(isSafeOrganizationSampleKey(runawayKey, organizationId, 'kit2'), true);
+  assert.equal(isSafeOrganizationSampleKey(`organizations/${organizationId}/samples/father/../guitar.mp3`, organizationId, 'kit1'), false);
+});
+
+test('cross-organization object path is denied before storage is created', async () => {
+  const previousEnvironment = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'staging';
+  let factoryCalls = 0;
+  try {
+    const result = await authorizeThenCreateStorage(
+      presetRequestWithDatabase(
+        [{ id: sampleId, organization_id: organizationId, storage_key: `organizations/${otherOrganizationId}/samples/father/guitar.mp3`, status: 'ready', kit_id: 'kit1', pad_index: 10 }],
+        [{ organization_id: organizationId, user_id: userId, deleted_at: null }],
+        organizationId,
+        'kit1-pad11',
+      ),
+      () => { factoryCalls += 1; return { get: async () => null }; },
+    );
+    assert.equal(result, null);
+    assert.equal(factoryCalls, 0);
+  } finally {
+    if (previousEnvironment === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousEnvironment;
+  }
+});
+
 test('storage is never created before authorization succeeds', async () => {
   let factoryCalls = 0;
   const storage: SampleStorage = { async get() { throw new Error('must not be called'); } };
@@ -239,4 +303,16 @@ test('unsafe tenant storage key is denied before storage creation', async () => 
   );
   assert.equal(result, null);
   assert.equal(factoryCalls, 0);
+});
+
+test('private sample Storage migration remains read-only, path-scoped, and membership-checked', async () => {
+  const migrationPath = path.join(process.cwd(), 'server', 'db', 'migrations', '0004_private_organization_sample_storage_read.up.sql');
+  const sql = await readFile(migrationPath, 'utf8');
+  assert.match(sql, /CREATE POLICY organization_members_read_private_named_samples/);
+  assert.match(sql, /ON storage\.objects\s+FOR SELECT\s+TO authenticated/);
+  assert.match(sql, /bucket_id = 'samples'/);
+  assert.match(sql, /\(storage\.foldername\(name\)\)\[4\] IN \('father', 'runaway'\)/);
+  assert.match(sql, /app\.is_active_member/);
+  assert.ok(sql.includes("name !~ '\\.\\.'"));
+  assert.doesNotMatch(sql, /FOR\s+(?:ALL|INSERT|UPDATE|DELETE)\b/i);
 });
