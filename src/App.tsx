@@ -7,9 +7,11 @@ import { SequencerView } from './components/views/SequencerView';
 import { MixerView } from './components/views/MixerView';
 import { SamplingView } from './components/views/SamplingView';
 import { KitBrowserModal } from './components/views/KitBrowserModal';
+import { PadStudioView } from './components/views/PadStudioView';
 import { GestureController } from './components/camera/GestureController';
 import { useStore } from './store/useStore';
 import { getSession, onAuthStateChange, signOut } from './services/auth/supabaseAuth';
+
 export const App: React.FC = () => {
   const { viewMode, loadPresetKit } = useStore();
   const [session, setSession] = useState<Session | null>(null);
@@ -54,20 +56,12 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (session?.user?.email_confirmed_at) {
-      void loadPresetKit('kit1');
-    }
+    if (session?.user?.email_confirmed_at) void loadPresetKit('kit1');
   }, [session, loadPresetKit]);
 
-  if (authLoading) {
-    return <div className="min-h-screen bg-[#07080a] flex items-center justify-center text-orange-500 font-mono tracking-[0.25em]">RESTORING SESSION...</div>;
-  }
-  if (authError) {
-    return <AuthScreen session={null} recoveryMode={false} onSignedOut={() => undefined} initialError={authError} />;
-  }
-  if (!session || recoveryMode || !session.user.email_confirmed_at) {
-    return <AuthScreen session={session} recoveryMode={recoveryMode} onSignedOut={() => setSession(null)} />;
-  }
+  if (authLoading) return <div className="min-h-screen bg-[#07080a] flex items-center justify-center text-orange-500 font-mono tracking-[0.25em]">RESTORING SESSION...</div>;
+  if (authError) return <AuthScreen session={null} recoveryMode={false} onSignedOut={() => undefined} initialError={authError} />;
+  if (!session || recoveryMode || !session.user.email_confirmed_at) return <AuthScreen session={session} recoveryMode={recoveryMode} onSignedOut={() => setSession(null)} />;
 
   return (
     <Chassis userEmail={session.user.email ?? undefined} onLogout={() => { void signOut(); }}>
@@ -76,7 +70,7 @@ export const App: React.FC = () => {
       {viewMode === 'MIXER' && <MixerView />}
       {viewMode === 'SAMPLING' && <SamplingView />}
       {viewMode === 'KITS' && <KitBrowserModal />}
-
+      {viewMode === 'PAD_STUDIO' && <PadStudioView />}
       <GestureController />
     </Chassis>
   );
