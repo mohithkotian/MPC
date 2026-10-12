@@ -31,18 +31,13 @@ function rms(buffer: AudioBuffer, startFrame: number, endFrame: number): number 
 }
 
 function sliceBuffer(source: AudioBuffer, start: number, end: number): AudioBuffer {
-  const ctx = new OfflineAudioContext(
-    source.numberOfChannels,
-    Math.max(1, Math.ceil((end - start) * source.sampleRate)),
-    source.sampleRate,
-  );
-  const output = ctx.createBuffer(source.numberOfChannels, ctx.length, source.sampleRate);
+  const frameCount = Math.max(1, Math.ceil((end - start) * source.sampleRate));
+  const output = new AudioContext().createBuffer(source.numberOfChannels, frameCount, source.sampleRate);
   const startFrame = Math.floor(start * source.sampleRate);
-  const endFrame = Math.min(source.length, startFrame + output.length);
-
+  const endFrame = Math.min(source.length, startFrame + frameCount);
   for (let channel = 0; channel < source.numberOfChannels; channel += 1) {
     const src = source.getChannelData(channel).subarray(startFrame, endFrame);
-    output.getChannelData(channel).set(src.subarray(0, output.length));
+    output.getChannelData(channel).set(src.subarray(0, frameCount));
   }
   return output;
 }
@@ -58,7 +53,6 @@ function encodeWav(buffer: AudioBuffer): Blob {
   const dataLength = buffer.length * channels * bytesPerSample;
   const arrayBuffer = new ArrayBuffer(44 + dataLength);
   const view = new DataView(arrayBuffer);
-
   writeString(view, 0, 'RIFF');
   view.setUint32(4, 36 + dataLength, true);
   writeString(view, 8, 'WAVE');
@@ -89,66 +83,11 @@ function makeCandidates(duration: number, count: number): Array<{ start: number;
   const window = Math.min(2, Math.max(0.75, duration / Math.max(count * 1.5, 1)));
   const step = Math.max(0.25, duration / Math.max(count * 4, 1));
   const candidates: Array<{ start: number; end: number }> = [];
-  for (let start = 0; start + window <= duration; start += step) {
-    candidates.push({ start, end: Math.min(duration, start + window) });
-  }
+  for (let start = 0; start + window <= duration; start += step) candidates.push({ start, end: Math.min(duration, start + window) });
   return candidates;
 }
 
-export async function splitMusicIntoPads(file: File, count = 16): Promise<SplitResult> {
-  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const context = new AudioCtx();
-  try {
-    const source = await context.decodeAudioData(await file.arrayBuffer());
-    const duration = source.duration;
-    const candidates = makeCandidates(duration, count);
-    const scored = candidates.map((candidate) => ({
-      ...candidate,
-      score: rms(source, Math.floor(candidate.start * source.sampleRate), Math.floor(candidate.end * source.sampleRate)),
-    }));
-
-    // Keep high-energy candidates while enforcing spacing so the same musical moment is not duplicated.
-    scored.sort((a, b) => b.score - a.score);
-    const minimumSpacing = Math.max(0.35, duration / Math.max(count * 2, 1));
-    const selected: typeof scored = [];
-    for (const candidate of scored) {
-      const overlaps = selected.some((existing) => Math.abs(existing.start - candidate.start) < minimumSpacing);
-      if (!overlaps) selected.push(candidate);
-      if (selected.length === count) break;
-    }
-
-    if (selected.length < count) {
-      for (let index = 0; index < count; index += 1) {
-        const start = (duration * index) / count;
-        const end = Math.min(duration, (duration * (index + 1)) / count);
-        if (!selected.some((item) => Math.abs(item.start - start) < minimumSpacing / 2)) {
-          selected.push({ start, end, score: rms(source, Math.floor(start * source.sampleRate), Math.floor(end * source.sampleRate)) });
-        }
-        if (selected.length === count) break;
-      }
-    }
-
-    selected.sort((a, b) => a.start - b.start);
-    const segments: PadSegment[] = selected.slice(0, count).map((segment, index) => {
-      const buffer = sliceBuffer(source, segment.start, segment.end);
-      return {
-        padIndex: index,
-        start: segment.start,
-        end: segment.end,
-        score: segment.score,
-        label: `PAD ${String(index + 1).padStart(2, '0')}`,
-        blob: encodeWav(buffer),
-        buffer,
-      };
-    });
-
-    return { sourceName: file.name, duration, segments };
-  } finally {
-    await context.close();
-  }
-}
-
-export async function readAudioBuffer(file: File): Promise<AudioBuffer> {
+export async function decodeMusic(file: File): Promise<AudioBuffer> {
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const context = new AudioCtx();
   try {
@@ -156,4 +95,52 @@ export async function readAudioBuffer(file: File): Promise<AudioBuffer> {
   } finally {
     await context.close();
   }
+}
+
+export function createManualPadSegment(source: AudioBuffer, padIndex: number, start: number, end: number): PadSegment {
+  const safeStart = Math.max(0, Math.min(source.duration, Math.round(start * 100) / 100));
+  const safeEnd = Math.max(safeStart + 0.01, Math.min(source.duration, Math.round(end * 100) / 100));
+  const buffer = sliceBuffer(source, safeStart, safeEnd);
+  return {
+    padIndex,
+    start: safeStart,
+    end: safeEnd,
+    score: rms(source, Math.floor(safeStart * source.sampleRate), Math.floor(safeEnd * source.sampleRate)),
+    label: `PAD ${String(padIndex + 1).padStart(2, '0')}`,
+    blob: encodeWav(buffer),
+    buffer,
+  };
+}
+
+export async function splitMusicIntoPads(file: File, count = 16): Promise<SplitResult> {
+  const source = await decodeMusic(file);
+  const duration = source.duration;
+  const candidates = makeCandidates(duration, count);
+  const scored = candidates.map((candidate) => ({
+    ...candidate,
+    score: rms(source, Math.floor(candidate.start * source.sampleRate), Math.floor(candidate.end * source.sampleRate)),
+  }));
+
+  scored.sort((a, b) => b.score - a.score);
+  const minimumSpacing = Math.max(0.35, duration / Math.max(count * 2, 1));
+  const selected: typeof scored = [];
+  for (const candidate of scored) {
+    if (!selected.some((existing) => Math.abs(existing.start - candidate.start) < minimumSpacing)) selected.push(candidate);
+    if (selected.length === count) break;
+  }
+
+  if (selected.length < count) {
+    for (let index = 0; index < count; index += 1) {
+      const start = (duration * index) / count;
+      const end = Math.min(duration, (duration * (index + 1)) / count);
+      if (!selected.some((item) => Math.abs(item.start - start) < minimumSpacing / 2)) {
+        selected.push({ start, end, score: rms(source, Math.floor(start * source.sampleRate), Math.floor(end * source.sampleRate)) });
+      }
+      if (selected.length === count) break;
+    }
+  }
+
+  selected.sort((a, b) => a.start - b.start);
+  const segments = selected.slice(0, count).map((segment, index) => createManualPadSegment(source, index, segment.start, segment.end));
+  return { sourceName: file.name, duration, segments };
 }
