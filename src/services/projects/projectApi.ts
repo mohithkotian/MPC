@@ -1,5 +1,6 @@
 import type { ProjectData } from '../../types';
 import { getSession } from '../auth/supabaseAuth';
+import { getActiveOrganizationId, OrganizationContextError, organizationRequestHeaders } from '../auth/organizationContext';
 import { projectFromCloudRecord, serializeProject } from './projectSerialization';
 
 export class CloudProjectError extends Error {
