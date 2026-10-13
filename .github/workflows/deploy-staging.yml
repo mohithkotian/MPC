@@ -100,22 +100,62 @@ jobs:
           RENDER_STAGING_FRONTEND_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
         run: |
           set -eu
-          test -n "$RENDER_STAGING_BACKEND_DEPLOY_HOOK"
-          test -n "$RENDER_STAGING_FRONTEND_DEPLOY_HOOK"
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+
+          const definitions = [
+            { label: 'backend', input: 'RENDER_STAGING_BACKEND_DEPLOY_HOOK', output: 'RENDER_STAGING_BACKEND_DEPLOY_HOOK_VALIDATED' },
+            { label: 'frontend', input: 'RENDER_STAGING_FRONTEND_DEPLOY_HOOK', output: 'RENDER_STAGING_FRONTEND_DEPLOY_HOOK_VALIDATED' },
+          ];
+          const normalized = [];
+          let failed = false;
+
+          for (const definition of definitions) {
+            const raw = process.env[definition.input] ?? '';
+            const value = raw.trim();
+            let url;
+            try { url = new URL(value); } catch { /* report safe checks below */ }
+
+            const checks = {
+              present: value.length > 0,
+              host: url?.protocol === 'https:' && url?.hostname === 'api.render.com' && !url.username && !url.password,
+              deployPath: Boolean(url && /^\/deploy\/srv-[A-Za-z0-9-]+$/.test(url.pathname)),
+              keyQuery: Boolean(url?.searchParams.get('key')),
+              whitespaceFree: value.length > 0 && !/\s/.test(value),
+              noFragment: Boolean(url && !url.hash),
+            };
+            const passed = Object.values(checks).every(Boolean);
+            console.log(`Render ${definition.label} hook validation: ${Object.entries(checks).map(([name, ok]) => `${name}=${ok ? 'OK' : 'FAIL'}`).join(', ')}; outerWhitespaceTrimmed=${raw !== value ? 'yes' : 'no'}`);
+            if (!passed) {
+              failed = true;
+              continue;
+            }
+            normalized.push({ ...definition, value });
+          }
+
+          if (failed) {
+            console.error('One or more Render hooks are malformed. No deploy request was sent. Correct the corresponding GitHub staging environment secret.');
+            process.exit(1);
+          }
+
+          for (const item of normalized) {
+            const escaped = item.value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+            process.stdout.write(`::add-mask::${escaped}\n`);
+            appendFileSync(process.env.GITHUB_ENV, `${item.output}=${item.value}\n`, { encoding: 'utf8' });
+          }
+          NODE
 
       - name: Trigger backend Render staging deploy
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_BACKEND_DEPLOY_HOOK }}
         run: |
-          test -n "$RENDER_DEPLOY_HOOK"
-          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+          set -eu
+          test -n "$RENDER_STAGING_BACKEND_DEPLOY_HOOK_VALIDATED"
+          curl --fail --silent --show-error --request POST "$RENDER_STAGING_BACKEND_DEPLOY_HOOK_VALIDATED" >/dev/null
 
       - name: Trigger frontend Render staging deploy
-        env:
-          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_FRONTEND_DEPLOY_HOOK }}
         run: |
-          test -n "$RENDER_DEPLOY_HOOK"
-          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" >/dev/null
+          set -eu
+          test -n "$RENDER_STAGING_FRONTEND_DEPLOY_HOOK_VALIDATED"
+          curl --fail --silent --show-error --request POST "$RENDER_STAGING_FRONTEND_DEPLOY_HOOK_VALIDATED" >/dev/null
 
       - name: Wait for staging backend readiness
         env:
