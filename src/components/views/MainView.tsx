@@ -55,12 +55,12 @@ export const MainView: React.FC = () => {
         <TransportBar />
       </div>
 
-      <div className="w-full lg:w-auto flex flex-col items-center space-y-3 bg-[#12131a] p-4 rounded-xl border border-[#1e2028]">
-        <div className="w-full flex items-center justify-between border-b border-[#1e2028] pb-2">
-          <PadBanks />
-          <div className="text-right font-mono text-xs font-black text-orange-500 uppercase tracking-widest drop-shadow">
+      <div className="w-full lg:w-auto flex flex-col items-center space-y-1.5 bg-[#12131a] p-3 rounded-xl border border-[#1e2028]">
+        <div className="w-full max-w-[500px] flex flex-col items-center gap-1">
+          <div className="text-center font-mono text-xs font-black text-orange-500 uppercase tracking-widest drop-shadow">
             MPC
           </div>
+          <PadBanks />
         </div>
         <PadGrid />
       </div>
