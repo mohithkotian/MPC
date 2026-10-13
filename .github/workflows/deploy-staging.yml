@@ -119,9 +119,9 @@ jobs:
             const checks = {
               present: value.length > 0,
               host: url?.protocol === 'https:' && url?.hostname === 'api.render.com' && !url.username && !url.password,
-              deployPath: Boolean(url && /^\\/deploy\\/srv-[A-Za-z0-9-]+$/.test(url.pathname)),
+              deployPath: Boolean(url && /^\/deploy\/srv-[A-Za-z0-9-]+$/.test(url.pathname)),
               keyQuery: Boolean(url?.searchParams.get('key')),
-              whitespaceFree: value.length > 0 && !/\\s/.test(value),
+              whitespaceFree: value.length > 0 && !/\s/.test(value),
               noFragment: Boolean(url && !url.hash),
             };
             const passed = Object.values(checks).every(Boolean);
@@ -139,9 +139,9 @@ jobs:
           }
 
           for (const item of normalized) {
-            const escaped = item.value.replace(/%/g, '%25').replace(/\\r/g, '%0D').replace(/\\n/g, '%0A');
-            process.stdout.write(`::add-mask::${escaped}\\n`);
-            appendFileSync(process.env.GITHUB_ENV, `${item.output}=${item.value}\\n`, { encoding: 'utf8' });
+            const escaped = item.value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+            process.stdout.write(`::add-mask::${escaped}\n`);
+            appendFileSync(process.env.GITHUB_ENV, `${item.output}=${item.value}\n`, { encoding: 'utf8' });
           }
           NODE
 
