@@ -80,6 +80,7 @@ async function run(): Promise<void> {
   await applyMigration(pool, '0001_multi_tenant_foundation.up.sql');
   await applyMigration(pool, '0002_auth_profile_bootstrap.up.sql');
   await applyMigration(pool, '0003_projects.up.sql');
+  await applyMigration(pool, '0005_projects_soft_delete_update_policy.up.sql');
 
   const tables = await pool.query<{ relname: string; relrowsecurity: boolean }>(
     `SELECT relname, relrowsecurity
@@ -284,6 +285,27 @@ async function run(): Promise<void> {
   await asAuthenticated(alphaAdmin, (client) => client.query('DELETE FROM public.samples WHERE id = $1', [adminSample]));
   const adminDeleted = await pool.query('SELECT id FROM public.samples WHERE id = $1', [adminSample]);
   await assert(adminDeleted.rows.length === 0, 'admin must be able to DELETE samples');
+
+  const memberProjectSoftDelete = await asAuthenticated(alphaMember, (client) =>
+    client.query(
+      'UPDATE public.projects SET deleted_at = now() WHERE id = $1',
+      [projectId],
+    ),
+  );
+  await assert(memberProjectSoftDelete.rowCount === 0, 'a non-owner member must not soft-delete another owner project');
+
+  const ownerSoftDelete = await asAuthenticated(alphaUser, (client) =>
+    client.query(
+      'UPDATE public.projects SET deleted_at = now() WHERE id = $1',
+      [projectId],
+    ),
+  );
+  await assert(ownerSoftDelete.rowCount === 1, 'project owner must be able to soft-delete a project');
+
+  const hiddenSoftDeletedProject = await asAuthenticated(alphaUser, (client) =>
+    client.query('SELECT id FROM public.projects WHERE id = $1', [projectId]),
+  );
+  await assert(hiddenSoftDeletedProject.rows.length === 0, 'soft-deleted project must remain hidden by the active-project SELECT policy');
 
   console.log('[Database tests] migration, RLS, anon restriction, membership removal, role matrix, and tenant isolation passed');
 }
