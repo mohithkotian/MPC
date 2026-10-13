@@ -72,6 +72,42 @@ async function readJson(response) {
   try { return await response.json(); } catch { return null; }
 }
 
+const PREDEPLOY_READINESS_ATTEMPTS = 3;
+const PREDEPLOY_READINESS_DELAY_MS = 500;
+
+export async function checkPreDeploymentReadiness({
+  backendUrl,
+  fetchImpl = globalThis.fetch,
+  delay = (milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds)),
+  log = console.log,
+  error = console.error,
+} = {}) {
+  for (let attempt = 1; attempt <= PREDEPLOY_READINESS_ATTEMPTS; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(`${backendUrl}/api/ready`, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const body = await readJson(response);
+      if (response.status === 200 && body?.status === 'ready') {
+        log(`PASS existing staging readiness before deployment: HTTP 200 (attempt ${attempt})`);
+        return true;
+      }
+      if (response.status < 500 || response.status > 599) {
+        error(`FAIL existing staging readiness before deployment: expected HTTP 200 with status ready, received HTTP ${response.status}`);
+        return false;
+      }
+      error(`RETRY existing staging readiness before deployment: HTTP ${response.status} (attempt ${attempt}/${PREDEPLOY_READINESS_ATTEMPTS})`);
+    } catch {
+      error(`RETRY existing staging readiness before deployment: request could not be completed (attempt ${attempt}/${PREDEPLOY_READINESS_ATTEMPTS})`);
+    }
+    if (attempt < PREDEPLOY_READINESS_ATTEMPTS) await delay(PREDEPLOY_READINESS_DELAY_MS);
+  }
+  error('FAIL existing staging readiness before deployment: readiness did not succeed after 3 attempts');
+  return false;
+}
+
 export async function runSmoke({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -311,10 +347,7 @@ export async function runPreflight({
     }
   }
 
-  const ready = await request('existing staging readiness before deployment', '/api/ready');
-  if (ready && (await readJson(ready))?.status !== 'ready') {
-    error('FAIL existing staging readiness body: status was not ready'); failures += 1;
-  }
+  if (!await checkPreDeploymentReadiness({ backendUrl: config.backendUrl, fetchImpl, log, error })) return 1;
 
   const session = await request('existing backend verifies staging test-account identity', '/api/auth/session', { headers });
   if (session && (await readJson(session))?.user?.id !== verifiedUser.id) {

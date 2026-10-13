@@ -24,7 +24,7 @@
     "test:staging-smoke": "node scripts/staging-smoke.mjs",
     "test:api": "node --import tsx --import ./server/tests/test-env.ts --test --test-concurrency=1 server/tests/api.test.ts server/tests/storage.test.ts server/tests/projectApiClient.test.ts server/tests/projects.api.test.ts server/tests/projects.validation.test.ts",
     "lint": "tsc --noEmit",
-    "test:staging-smoke-auth": "node --test scripts/staging-smoke-auth.test.mjs"
+    "test:staging-smoke-auth": "node --test scripts/staging-smoke-auth.test.mjs scripts/staging-smoke.test.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.35",
