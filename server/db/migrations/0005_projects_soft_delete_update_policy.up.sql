@@ -25,17 +25,8 @@ CREATE POLICY projects_update_owner_admin
   )
   WITH CHECK (
     app.is_active_member(organization_id)
-    AND (
-      owner_id = auth.uid()
-      OR EXISTS (
-        SELECT 1
-        FROM public.organization_members member
-        WHERE member.organization_id = projects.organization_id
-          AND member.user_id = auth.uid()
-          AND member.deleted_at IS NULL
-          AND member.role IN ('owner', 'admin')
-      )
-    )
+    AND owner_id = projects.owner_id
+    AND organization_id = projects.organization_id
   );
 
 COMMENT ON POLICY projects_update_owner_admin ON public.projects IS
