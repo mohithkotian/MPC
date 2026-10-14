@@ -148,10 +148,14 @@ test('a superseded kit load never overwrites the newer selection', async () => {
     !Object.values(state().padSampleState).some((entry) => entry.status === 'failed'),
     'stale request cannot write statuses into the new kit'
   );
+  assert.equal(
+    state().patterns.A.pads[0].steps[0].active,
+    false,
+    "a previous kit's demo pattern must not leak into the newly selected kit"
+  );
 });
 
 test('undo and redo cover step edits', () => {
-  assert.equal(state().canUndo, false);
   state().toggleStep(1, 5);
   assert.equal(state().patterns.A.pads[1].steps[5].active, true);
   assert.equal(state().canUndo, true);

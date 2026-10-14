@@ -872,7 +872,14 @@ export const useStore = create<MPCState>((set, get) => {
 
       if (!guard()) return; // a newer kit selection superseded this request
 
-      const demoPatterns = { ...initialPatterns };
+      // Fresh patterns per kit load: a shallow copy of the shared initial
+      // patterns would let one kit's demo steps leak into every other kit.
+      const demoPatterns: Record<BankId, BankPattern> = {
+        A: createEmptyPattern('A'),
+        B: createEmptyPattern('B'),
+        C: createEmptyPattern('C'),
+        D: createEmptyPattern('D'),
+      };
       if (kitId === 'kit1') {
         demoPatterns.A.pads[0].steps[0].active = true;
         demoPatterns.A.pads[0].steps[8].active = true;
