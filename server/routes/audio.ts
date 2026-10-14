@@ -7,6 +7,18 @@ import { createSampleStorage } from '../storage';
 import { isSafeOrganizationSampleKey, isSafeStorageKey, StorageProviderError, type SampleStorage } from '../storage/SampleStorage';
 import { incrementMetric, log, requestId } from '../observability';
 
+function providerErrorContext(error: unknown): { providerCode: string; providerMessage: string } {
+  const provider = typeof error === 'object' && error !== null
+    ? error as { code?: unknown; message?: unknown }
+    : {};
+  return {
+    providerCode: typeof provider.code === 'string' ? provider.code : 'unknown',
+    providerMessage: typeof provider.message === 'string'
+      ? provider.message
+      : error instanceof Error ? error.message : 'unknown provider error',
+  };
+}
+
 interface SampleManifestEntry {
   id: string;
   originalName: string;
@@ -136,13 +148,29 @@ export function createAudioRouter(storageFactory: StorageFactory = (req) => crea
     if (organizationId) {
       if (!UUID_PATTERN.test(organizationId)) { res.status(400).json({ error: 'x-organization-id must be a UUID' }); return; }
       const { data, error } = await req.supabase!.from('samples').select('id, original_name, kit_id, pad_index').eq('organization_id', organizationId).is('deleted_at', null).eq('status', 'ready');
-      if (error) { res.status(502).json({ error: 'Unable to load sample catalog' }); return; }
+      if (error) {
+        log('error', 'audio.manifest_query_failed', {
+          requestId: requestId(req),
+          scope: 'organization',
+          ...providerErrorContext(error),
+        });
+        res.status(502).json({ error: 'Unable to load sample catalog' });
+        return;
+      }
       res.json(Object.fromEntries((data ?? []).map((sample) => [sample.id, { id: sample.id, kitId: sample.kit_id, padIndex: sample.pad_index, name: sample.original_name }])));
       return;
     }
     if (isNonLocal) {
       const { data, error } = await req.supabase!.from('samples').select('id, original_name, kit_id, pad_index').is('deleted_at', null).eq('status', 'ready');
-      if (error) { res.status(502).json({ error: 'Unable to load sample catalog' }); return; }
+      if (error) {
+        log('error', 'audio.manifest_query_failed', {
+          requestId: requestId(req),
+          scope: 'all',
+          ...providerErrorContext(error),
+        });
+        res.status(502).json({ error: 'Unable to load sample catalog' });
+        return;
+      }
       res.json(Object.fromEntries((data ?? []).map((sample) => [sample.id, { id: sample.id, kitId: sample.kit_id, padIndex: sample.pad_index, name: sample.original_name }])));
       return;
     }
