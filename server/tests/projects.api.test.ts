@@ -47,6 +47,7 @@ before(() => {
       if (url.includes(otherOrganizationId)) return json([]);
       return json([{ role: 'owner' }]);
     }
+    if (url.endsWith('/rest/v1/rpc/soft_delete_project') && method === 'POST') return json(true);
     if (url.includes('/rest/v1/projects')) {
       if (method === 'POST') {
         const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
