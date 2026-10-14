@@ -23,11 +23,10 @@ CREATE POLICY projects_update_owner_admin
       )
     )
   )
-  WITH CHECK (
-    app.is_active_member(organization_id)
-    AND owner_id = projects.owner_id
-    AND organization_id = projects.organization_id
-  );
+  -- The USING predicate authorizes the existing row. The immutable-scope
+  -- trigger rejects changes to owner_id and organization_id; allow an
+  -- authorized owner/admin to set deleted_at for soft deletion.
+  WITH CHECK (true);
 
 COMMENT ON POLICY projects_update_owner_admin ON public.projects IS
   'Active authorized owners/admins may update projects or soft-delete them by setting deleted_at; soft-deleted rows remain hidden by the SELECT policy.';
