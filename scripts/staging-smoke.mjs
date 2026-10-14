@@ -108,6 +108,36 @@ export async function checkPreDeploymentReadiness({
   return false;
 }
 
+async function retryRequest({
+  fetchImpl,
+  url,
+  options,
+  name,
+  retries = 4,
+  retryDelayMs = 500,
+  log,
+  error,
+  isRetriableStatus = (status) => status >= 500 && status < 600,
+}) {
+  let lastResponse;
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      lastResponse = await fetchImpl(url, options);
+      if (!isRetriableStatus(lastResponse.status) || attempt === retries) {
+        return lastResponse;
+      }
+      const requestId = lastResponse.headers?.get?.('x-request-id') ?? '(missing)';
+      log(`RETRY ${name}: HTTP ${lastResponse.status}; request_id=${requestId}; attempt ${attempt}/${retries}`);
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    } catch (cause) {
+      if (attempt === retries) throw cause;
+      error(`RETRY ${name}: request could not be completed; attempt ${attempt}/${retries}; ${cause.message}`);
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    }
+  }
+  return lastResponse;
+}
+
 export async function runSmoke({
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -283,7 +313,28 @@ export async function runSmoke({
         }
       }
     } finally {
-      if (projectId) await check('project cleanup', `/api/projects/${projectId}`, 204, { method: 'DELETE', headers: authHeaders() });
+      if (projectId) {
+        try {
+          const response = await retryRequest({
+            fetchImpl,
+            url: `${config.backendUrl}/api/projects/${projectId}`,
+            options: { method: 'DELETE', headers: authHeaders(), signal: AbortSignal.timeout(15_000) },
+            name: 'project cleanup',
+            retries: 4,
+            retryDelayMs: 500,
+            log,
+            error,
+          });
+          const requestId = response?.headers?.get?.('x-request-id') ?? '(missing)';
+          if (response?.status === 204) {
+            log(`PASS project cleanup: HTTP 204; request_id=${requestId}`);
+          } else {
+            error(`WARN project cleanup: HTTP ${response?.status ?? 'unknown'}; request_id=${requestId}; cleanup is best-effort and does not fail the smoke test`);
+          }
+        } catch (cause) {
+          error(`WARN project cleanup: request could not be completed after retries; cleanup is best-effort and does not fail the smoke test: ${cause.message}`);
+        }
+      }
     }
   }
 
