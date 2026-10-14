@@ -193,13 +193,14 @@ export async function deleteProject(client: RequestSupabaseClient, user: User, o
   const role = await requireOrganizationRole(client, user, organizationId);
   const existing = await getProjectRecord(client, user, organizationId, projectId);
   assertOwnerOrAdmin(role, existing.owner_id, user.id);
-  const { error } = await client
-    .from('projects')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', existing.id)
-    .eq('organization_id', organizationId)
-    .is('deleted_at', null);
+  const { data, error } = await client.rpc('soft_delete_project', {
+    target_project_id: existing.id,
+    target_organization_id: organizationId,
+  });
   if (error) throw new ProjectServiceError(502, 'Unable to delete project');
+  if (data !== true) {
+    throw new ProjectServiceError(403, 'Project write permission denied');
+  }
 }
 
 async function getProjectRecord(client: RequestSupabaseClient, user: User, organizationId: string, projectId: string): Promise<ProjectRecord> {
