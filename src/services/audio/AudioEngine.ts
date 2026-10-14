@@ -9,6 +9,8 @@ class AudioEngineService {
   private activeChokeNodes: Map<number, { source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }[]> = new Map();
   private activePadVoices: Map<string, { source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }[]> = new Map();
   private allActiveVoices: Set<{ source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }> = new Set();
+  private mutedPads = new Set<string>();
+  private soloPads = new Set<string>();
 
   constructor() {
     // AudioContext will be initialized on first user gesture or resume
@@ -94,6 +96,7 @@ class AudioEngineService {
     velocity: number = 1.0,
     padKey?: string
   ) {
+    if (padKey && (this.mutedPads.has(padKey) || (this.soloPads.size > 0 && !this.soloPads.has(padKey)))) return;
     const ctx = this.getContext();
     const now = ctx.currentTime;
 
@@ -364,6 +367,30 @@ class AudioEngineService {
       output[i] = Math.random() * 2 - 1;
     }
     return buffer;
+  }
+
+  public setPadMuted(padKey: string, muted: boolean) {
+    if (muted) this.mutedPads.add(padKey);
+    else this.mutedPads.delete(padKey);
+    this.updatePadVoiceGains();
+  }
+
+  public setSoloPads(padKeys: string[]) {
+    this.soloPads = new Set(padKeys);
+    this.updatePadVoiceGains();
+  }
+
+  private updatePadVoiceGains() {
+    for (const [padKey, voices] of this.activePadVoices) {
+      const audible = !this.mutedPads.has(padKey) && (this.soloPads.size === 0 || this.soloPads.has(padKey));
+      for (const { gain } of voices) {
+        try {
+          gain.gain.setTargetAtTime(audible ? 1 : 0, this.ctx?.currentTime ?? 0, 0.005);
+        } catch {
+          // A voice may have ended between iteration and gain update.
+        }
+      }
+    }
   }
 
   private trackChokeNode(chokeGroup: number, source: AudioBufferSourceNode | OscillatorNode, gain: GainNode) {

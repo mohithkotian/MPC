@@ -13,36 +13,38 @@ export interface SynthParams {
 }
 
 export interface PadConfig {
-  id: number; // 0..15 (or 0..63 absolute across 4 banks)
+  id: number;
   bank: BankId;
-  bankPadIndex: number; // 0..15
+  bankPadIndex: number;
   name: string;
   keyLabel: string;
   sampleId?: string;
   audioUrl?: string;
   audioBuffer?: AudioBuffer | null;
-  volume: number; // 0 to 1
-  pitch: number; // -12 to +12 semitones
-  pan: number; // -1 to 1
-  chokeGroup: number; // 0 = no choke, 1..4 = choke groups
+  volume: number;
+  pitch: number;
+  pan: number;
+  isMuted?: boolean;
+  isSolo?: boolean;
+  chokeGroup: number;
   synthParams?: SynthParams;
-  sampleStart?: number; // 0 to 1
-  sampleEnd?: number; // 0 to 1
+  sampleStart?: number;
+  sampleEnd?: number;
 }
 
 export interface Step {
   active: boolean;
-  velocity: number; // 0 to 1
+  velocity: number;
 }
 
 export interface PadPattern {
-  padId: number; // 0..15 within bank
-  steps: Step[]; // array of 16 steps
+  padId: number;
+  steps: Step[];
 }
 
 export interface BankPattern {
   bankId: BankId;
-  pads: PadPattern[]; // 16 pad patterns
+  pads: PadPattern[];
 }
 
 export interface ProjectData {

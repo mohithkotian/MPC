@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { ViewMode } from '../../types';
-import { Grid, Layers, Sliders, Music, Disc } from 'lucide-react';
+import { Grid, Layers, Sliders, Music, Disc, Undo2, Redo2 } from 'lucide-react';
 
 interface ChassisProps {
   children: React.ReactNode;
@@ -10,7 +10,25 @@ interface ChassisProps {
 }
 
 export const Chassis: React.FC<ChassisProps> = ({ children, userEmail, onLogout }) => {
-  const { viewMode, setViewMode } = useStore();
+  const { viewMode, setViewMode, undo, redo, canUndo, canRedo } = useStore();
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable) return;
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier || event.altKey) return;
+      if (event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) redo(); else undo();
+      } else if (event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [redo, undo]);
 
   const tabs: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
     { mode: 'MAIN', label: 'MAIN', icon: <Grid className="w-3.5 h-3.5" /> },
@@ -41,6 +59,10 @@ export const Chassis: React.FC<ChassisProps> = ({ children, userEmail, onLogout 
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]" aria-label="History controls">
+              <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" className="p-1.5 rounded text-gray-400 hover:text-orange-300 disabled:opacity-30 disabled:hover:text-gray-400"><Undo2 className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" className="p-1.5 rounded text-gray-400 hover:text-orange-300 disabled:opacity-30 disabled:hover:text-gray-400"><Redo2 className="w-3.5 h-3.5" /></button>
+            </div>
             {userEmail && <span className="hidden lg:inline text-[9px] text-gray-500 max-w-40 truncate" title={userEmail}>{userEmail}</span>}
             {onLogout && <button type="button" onClick={onLogout} className="px-2 py-1.5 rounded-md text-[10px] font-black tracking-wider text-gray-500 border border-[#1e2028] hover:text-orange-400 hover:border-orange-500/50">LOG OUT</button>}
             <div className="flex items-center space-x-1 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]">

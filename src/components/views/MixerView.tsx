@@ -5,7 +5,7 @@ import { KEY_LABELS } from '../../services/audio/presetKits';
 import { Volume2 } from 'lucide-react';
 
 export const MixerView: React.FC = () => {
-  const { activeBank, banks, updatePad, masterVolume, setMasterVolume } = useStore();
+  const { activeBank, banks, updatePad, togglePadMute, togglePadSolo, masterVolume, setMasterVolume } = useStore();
   const currentPads = banks[activeBank];
 
   return (
@@ -93,6 +93,10 @@ export const MixerView: React.FC = () => {
             <span className="text-[9px] font-mono font-bold text-gray-400">
               {Math.round(pad.volume * 100)}%
             </span>
+            <div className="flex gap-1 w-full">
+              <button type="button" onClick={() => togglePadMute(activeBank, idx)} className={`flex-1 rounded border py-1 text-[8px] font-black ${pad.isMuted ? 'border-red-500 bg-red-900/50 text-red-200' : 'border-[#1e2028] text-gray-500 hover:text-red-300'}`}>MUTE</button>
+              <button type="button" onClick={() => togglePadSolo(activeBank, idx)} className={`flex-1 rounded border py-1 text-[8px] font-black ${pad.isSolo ? 'border-amber-400 bg-amber-900/50 text-amber-200' : 'border-[#1e2028] text-gray-500 hover:text-amber-300'}`}>SOLO</button>
+            </div>
           </div>
         ))}
       </div>
