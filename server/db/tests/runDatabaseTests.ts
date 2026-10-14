@@ -80,7 +80,7 @@ async function run(): Promise<void> {
   await applyMigration(pool, '0001_multi_tenant_foundation.up.sql');
   await applyMigration(pool, '0002_auth_profile_bootstrap.up.sql');
   await applyMigration(pool, '0003_projects.up.sql');
-  await applyMigration(pool, '0005_projects_soft_delete_update_policy.up.sql');
+  await applyMigration(pool, '0005_projects_soft_delete_rpc.up.sql');
 
   const tables = await pool.query<{ relname: string; relrowsecurity: boolean }>(
     `SELECT relname, relrowsecurity
@@ -287,20 +287,28 @@ async function run(): Promise<void> {
   await assert(adminDeleted.rows.length === 0, 'admin must be able to DELETE samples');
 
   const memberProjectSoftDelete = await asAuthenticated(alphaMember, (client) =>
-    client.query(
-      'UPDATE public.projects SET deleted_at = now() WHERE id = $1',
-      [projectId],
+    client.query<{ deleted: boolean }>(
+      'SELECT public.soft_delete_project($1, $2) AS deleted',
+      [projectId, alphaOrganization.id],
     ),
   );
-  await assert(memberProjectSoftDelete.rowCount === 0, 'a non-owner member must not soft-delete another owner project');
+  await assert(memberProjectSoftDelete.rows[0]?.deleted === false, 'a non-owner member must not soft-delete another owner project');
+
+  const crossOrganizationSoftDelete = await asAuthenticated(betaUser, (client) =>
+    client.query<{ deleted: boolean }>(
+      'SELECT public.soft_delete_project($1, $2) AS deleted',
+      [projectId, alphaOrganization.id],
+    ),
+  );
+  await assert(crossOrganizationSoftDelete.rows[0]?.deleted === false, 'a user outside the project organization must not soft-delete it');
 
   const ownerSoftDelete = await asAuthenticated(alphaUser, (client) =>
-    client.query(
-      'UPDATE public.projects SET deleted_at = now() WHERE id = $1',
-      [projectId],
+    client.query<{ deleted: boolean }>(
+      'SELECT public.soft_delete_project($1, $2) AS deleted',
+      [projectId, alphaOrganization.id],
     ),
   );
-  await assert(ownerSoftDelete.rowCount === 1, 'project owner must be able to soft-delete a project');
+  await assert(ownerSoftDelete.rows[0]?.deleted === true, 'project owner must be able to soft-delete a project');
 
   const hiddenSoftDeletedProject = await asAuthenticated(alphaUser, (client) =>
     client.query('SELECT id FROM public.projects WHERE id = $1', [projectId]),
