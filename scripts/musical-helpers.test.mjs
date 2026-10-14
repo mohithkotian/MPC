@@ -4,6 +4,7 @@ import { shouldPlayPad, hasSoloPad, getSwingDelayMs } from '../src/services/audi
 import { encodePcmWav } from '../src/services/audio/wavEncoder.ts';
 import { cloneMusicalSnapshot, createMusicalSnapshot } from '../src/services/projects/musicalHistory.ts';
 import { projectFromCloudRecord, serializeProject } from '../src/services/projects/projectSerialization.ts';
+import { renderProjectToWav } from '../src/services/audio/wavExport.ts';
 
 function makePad(overrides = {}) {
   return {
@@ -67,6 +68,36 @@ test('musical history snapshots omit runtime buffers and clone independently', (
   clone.patterns.A.pads[0].steps[0].active = false;
   assert.equal(snapshot.banks.A[0].name, 'Sample pad');
   assert.equal(snapshot.patterns.A.pads[0].steps[0].active, true);
+});
+
+test('WAV export refuses an empty pattern with a clear error instead of fake output', async () => {
+  globalThis.window = globalThis.window ?? {};
+  globalThis.window.OfflineAudioContext = class {
+    constructor() {
+      throw new Error('OfflineAudioContext must not be constructed for an empty pattern');
+    }
+  };
+  const inactiveSteps = Array.from({ length: 16 }, () => ({ active: false, velocity: 0.9 }));
+  const padPattern = { padId: 0, steps: inactiveSteps };
+  const project = {
+    id: 'empty-project',
+    name: 'Empty',
+    artist: '',
+    bpm: 120,
+    swing: 0,
+    masterVolume: 1,
+    activeBank: 'A',
+    banks: { A: [], B: [], C: [], D: [] },
+    patterns: {
+      A: { bankId: 'A', pads: [padPattern] },
+      B: { bankId: 'B', pads: [padPattern] },
+      C: { bankId: 'C', pads: [padPattern] },
+      D: { bankId: 'D', pads: [padPattern] },
+    },
+    createdAt: 1,
+    updatedAt: 2,
+  };
+  await assert.rejects(() => renderProjectToWav(project), /no active steps/);
 });
 
 test('sample assignments survive project serialization for reload restoration', () => {

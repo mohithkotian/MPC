@@ -18,6 +18,7 @@ export const OLEDDisplay: React.FC = () => {
   const isInfoActive = useStore(state => state.isInfoActive);
   const selectedPadIndex = useStore(state => state.selectedPadIndex);
   const activePad = useStore(state => state.banks[state.activeBank][state.selectedPadIndex]);
+  const activePadSampleStatus = useStore(state => state.padSampleState[`${state.activeBank}-${state.selectedPadIndex}`]?.status);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -66,7 +67,13 @@ export const OLEDDisplay: React.FC = () => {
   const customKitNames = useStore(state => state.customKitNames);
   const currentSongName = customKitNames[activePresetId] || (activePresetId === 'kit1' ? 'FATHER' : activePresetId === 'kit2' ? 'RUNAWAY' : 'SAMPLE');
 
-  const sampleDuration = activePad ? audioEngine.getPadDuration(activePad.audioBuffer || null, activePad.synthParams) : 'N/A';
+  const sampleDuration = !activePad
+    ? 'N/A'
+    : activePadSampleStatus === 'loading'
+      ? 'LOADING...'
+    : activePadSampleStatus === 'failed'
+      ? 'ERR'
+    : audioEngine.getPadDuration(activePad.audioBuffer || null, activePad.synthParams);
 
   return (
     <div className="relative w-full max-w-[440px] h-[190px] rounded-sm p-4 bg-oled-bay oled-scanlines flex flex-col justify-between select-none overflow-hidden font-oled text-oled-red border-2 border-black shadow-oled-glow">

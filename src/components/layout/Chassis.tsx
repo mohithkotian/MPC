@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useStore } from '../../store/useStore';
 import { ViewMode } from '../../types';
 import { Grid, Layers, Sliders, Music, Disc, Undo2, Redo2 } from 'lucide-react';
+import { ExportWavButton } from '../controls/ExportWavButton';
 
 interface ChassisProps {
   children: React.ReactNode;
@@ -58,10 +59,13 @@ export const Chassis: React.FC<ChassisProps> = ({ children, userEmail, onLogout 
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-center">
             <div className="flex items-center gap-1 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]" aria-label="History controls">
               <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl/Cmd+Z)" aria-label="Undo" className="p-1.5 rounded text-gray-400 hover:text-orange-300 disabled:opacity-30 disabled:hover:text-gray-400"><Undo2 className="w-3.5 h-3.5" /></button>
-              <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z)" aria-label="Redo" className="p-1.5 rounded text-gray-400 hover:text-orange-300 disabled:opacity-30 disabled:hover:text-gray-400"><Redo2 className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y)" aria-label="Redo" className="p-1.5 rounded text-gray-400 hover:text-orange-300 disabled:opacity-30 disabled:hover:text-gray-400"><Redo2 className="w-3.5 h-3.5" /></button>
+            </div>
+            <div className="flex items-center gap-1.5 bg-[#0c0d11] p-1 rounded-lg border border-[#1e2028]" aria-label="Export controls">
+              <ExportWavButton compact />
             </div>
             {userEmail && <span className="hidden lg:inline text-[9px] text-gray-500 max-w-40 truncate" title={userEmail}>{userEmail}</span>}
             {onLogout && <button type="button" onClick={onLogout} className="px-2 py-1.5 rounded-md text-[10px] font-black tracking-wider text-gray-500 border border-[#1e2028] hover:text-orange-400 hover:border-orange-500/50">LOG OUT</button>}

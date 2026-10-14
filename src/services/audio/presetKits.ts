@@ -44,9 +44,9 @@ export const PRESET_KITS: Record<string, PresetKit> = {
         { bankPadIndex: 10, name: 'Pluck', audioUrl: 'kit1-pad11', synthParams: { type: 'piano', frequency: 392, decay: 0.35 } },
         { bankPadIndex: 11, name: 'Pad Long', audioUrl: 'kit1-pad12', synthParams: { type: 'lead', frequency: 261.63, decay: 0.85 } },
         { bankPadIndex: 12, name: 'Riser', audioUrl: 'kit1-pad13', synthParams: { type: 'snare', noiseFilter: 1200, decay: 0.35 } },
-        { bankPadIndex: 13, name: 'Stop' },
-        { bankPadIndex: 14, name: 'Camera' },
-        { bankPadIndex: 15, name: 'Info' },
+        { bankPadIndex: 13, name: 'Vox Chop 2', synthParams: { type: 'lead', frequency: 349.23, decay: 0.4 } },
+        { bankPadIndex: 14, name: 'Perc Hit', synthParams: { type: 'clap', decay: 0.25 } },
+        { bankPadIndex: 15, name: 'Shaker', synthParams: { type: 'hihat', decay: 0.12 } },
       ],
       B: [], C: [], D: []
     }
@@ -73,9 +73,9 @@ export const PRESET_KITS: Record<string, PresetKit> = {
         { bankPadIndex: 10, name: 'Vocal', audioUrl: 'kit2-pad11', synthParams: { type: 'lead', frequency: 440, decay: 0.6 } },
         { bankPadIndex: 11, name: 'Synth Pad', audioUrl: 'kit2-pad12', synthParams: { type: 'piano', frequency: 330, decay: 0.9 } },
         { bankPadIndex: 12, name: 'Loop', audioUrl: 'kit2-pad13', synthParams: { type: 'subbass', frequency: 65.4, decay: 0.8 } },
-        { bankPadIndex: 13, name: 'Stop' },
-        { bankPadIndex: 14, name: 'Camera' },
-        { bankPadIndex: 15, name: 'Info' },
+        { bankPadIndex: 13, name: 'Piano 9', synthParams: { type: 'piano', frequency: 587.33, decay: 0.7 } },
+        { bankPadIndex: 14, name: 'Vox Stab 2', synthParams: { type: 'lead', frequency: 880, decay: 0.35 } },
+        { bankPadIndex: 15, name: 'Atmos', synthParams: { type: 'lead', frequency: 220, decay: 0.9 } },
       ],
       B: [], C: [], D: []
     }
@@ -102,9 +102,9 @@ export const PRESET_KITS: Record<string, PresetKit> = {
         { bankPadIndex: 10, name: 'Lead C3', synthParams: { type: 'lead', frequency: 130.8, decay: 0.5 } },
         { bankPadIndex: 11, name: 'Lead E3', synthParams: { type: 'lead', frequency: 164.8, decay: 0.5 } },
         { bankPadIndex: 12, name: 'Keys C4', synthParams: { type: 'piano', frequency: 261.6, decay: 0.6 } },
-        { bankPadIndex: 13, name: 'Stop' },
-        { bankPadIndex: 14, name: 'Camera' },
-        { bankPadIndex: 15, name: 'Info' },
+        { bankPadIndex: 13, name: 'Rim Shot', synthParams: { type: 'snare', noiseFilter: 2400, decay: 0.12 } },
+        { bankPadIndex: 14, name: 'Clap 2', synthParams: { type: 'clap', decay: 0.2 } },
+        { bankPadIndex: 15, name: 'Open Hat', synthParams: { type: 'hihat', decay: 0.45 }, chokeGroup: 1 },
       ],
       B: [], C: [], D: []
     }

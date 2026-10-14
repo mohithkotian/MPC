@@ -11,7 +11,7 @@ import { GestureController } from './components/camera/GestureController';
 import { useStore } from './store/useStore';
 import { getSession, onAuthStateChange, signOut } from './services/auth/supabaseAuth';
 export const App: React.FC = () => {
-  const { viewMode, loadPresetKit } = useStore();
+  const { viewMode, restoreSession } = useStore();
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -53,11 +53,17 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  const restoredRef = React.useRef(false);
   useEffect(() => {
     if (session?.user?.email_confirmed_at) {
-      void loadPresetKit('kit1');
+      // Restore the last opened kit/project once per sign-in (falls back to the default kit).
+      if (restoredRef.current) return;
+      restoredRef.current = true;
+      void restoreSession();
+    } else if (!session) {
+      restoredRef.current = false;
     }
-  }, [session, loadPresetKit]);
+  }, [session, restoreSession]);
 
   if (authLoading) {
     return <div className="min-h-screen bg-[#07080a] flex items-center justify-center text-orange-500 font-mono tracking-[0.25em]">RESTORING SESSION...</div>;

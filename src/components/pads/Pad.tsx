@@ -18,6 +18,7 @@ export const Pad: React.FC<PadProps> = ({
   onSelect,
 }) => {
   const [isPressed, setIsPressed] = useState(false);
+  const sampleState = useStore((s) => s.padSampleState[`${pad.bank}-${pad.bankPadIndex}`]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
     setIsPressed(true);
@@ -77,6 +78,20 @@ export const Pad: React.FC<PadProps> = ({
       <span className="text-[10px] font-black text-gray-400 tracking-wider block shrink-0">
         {pad.keyLabel}
       </span>
+
+      {sampleState?.status === 'loading' && (
+        <span className="absolute top-1 right-1 text-[7px] font-mono font-bold text-amber-400 animate-pulse leading-none tracking-wider">
+          LOAD
+        </span>
+      )}
+      {sampleState?.status === 'failed' && (
+        <span
+          title={sampleState.error || 'This pad\'s sample failed to load'}
+          className="absolute top-1 right-1 text-[7px] font-mono font-bold text-red-200 bg-red-900/80 border border-red-500/60 px-1 py-0.5 rounded leading-none tracking-wider"
+        >
+          ERR
+        </span>
+      )}
 
       <div className="my-auto text-center w-full px-0.5 min-w-0 overflow-hidden shrink flex flex-col justify-center items-center">
         {isEditing ? (

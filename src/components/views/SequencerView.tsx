@@ -3,15 +3,25 @@ import { useStore } from '../../store/useStore';
 import { Trash2, Play, Square, Sliders } from 'lucide-react';
 import { KEY_LABELS } from '../../services/audio/presetKits';
 
+const VELOCITY_CYCLE = [0.95, 0.5, 0.75, 1.0];
+
+function nextVelocity(current: number): number {
+  const idx = VELOCITY_CYCLE.findIndex((value) => Math.abs(value - current) < 0.02);
+  return VELOCITY_CYCLE[(idx + 1) % VELOCITY_CYCLE.length];
+}
+
 export const SequencerView: React.FC = () => {
   const {
     activeBank,
     banks,
     patterns,
     toggleStep,
+    setStepVelocity,
     clearBankPattern,
     currentStep,
     isPlaying,
+    isRecording,
+    isOverdubbing,
     togglePlay,
     stopPlayback,
     swing,
@@ -29,7 +39,14 @@ export const SequencerView: React.FC = () => {
             <Sliders className="w-5 h-5 text-orange-500" />
             Step Sequencer - Bank {activeBank}
           </h2>
-          <p className="text-xs text-gray-500">Click steps to toggle beats. Use transport to play.</p>
+          <p className="text-xs text-gray-500">
+            Click steps to toggle beats. Shift+click an active step to change its velocity.
+            {(isRecording || isOverdubbing) && isPlaying && (
+              <span className="ml-2 text-orange-400 font-bold">
+                {isRecording ? 'REC' : 'DUB'} ARMED — hit pads to write steps at the current beat.
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex items-center space-x-3">
@@ -68,6 +85,8 @@ export const SequencerView: React.FC = () => {
         </div>
       </div>
 
+      <div className="overflow-x-auto custom-scrollbar pb-1">
+      <div className="min-w-[640px]">
       <div className="grid grid-cols-[140px_1fr] gap-2 items-center mb-2">
         <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest pl-2">PAD</div>
         <div className="grid grid-cols-16 gap-1">
@@ -112,7 +131,14 @@ export const SequencerView: React.FC = () => {
                   return (
                     <button
                       key={stepIdx}
-                      onClick={() => toggleStep(padIdx, stepIdx)}
+                      onClick={(e) => {
+                        if (e.shiftKey && stepState.active) {
+                          setStepVelocity(padIdx, stepIdx, nextVelocity(stepState.velocity));
+                        } else {
+                          toggleStep(padIdx, stepIdx);
+                        }
+                      }}
+                      title={`Step ${stepIdx + 1} — click to toggle, shift+click for velocity (${Math.round(stepState.velocity * 100)}%)`}
                       className={`h-6 rounded border transition-all duration-75 flex items-center justify-center text-[8px] font-mono ${
                         stepState.active
                           ? 'bg-gradient-to-b from-orange-500 to-amber-600 border-orange-300/60 text-black font-extrabold shadow-[inset_0_0_6px_rgba(255,102,0,0.6),_0_0_6px_rgba(255,102,0,0.3)]'
@@ -129,6 +155,8 @@ export const SequencerView: React.FC = () => {
             </div>
           );
         })}
+      </div>
+      </div>
       </div>
     </div>
   );

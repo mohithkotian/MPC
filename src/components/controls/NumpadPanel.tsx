@@ -41,7 +41,7 @@ export const NumpadPanel: React.FC = () => {
           <button
             onClick={stopAllPlayback}
             className="px-2.5 py-1.5 rounded bg-gradient-to-b from-[#2a2d36] to-[#17181f] text-red-400 border border-red-900/60 shadow-beveled-btn hover:bg-red-950/40 hover:border-red-600 flex items-center space-x-1 transition-all"
-            title="Stop All Sounds (ESC / N)"
+            title="Stop All Sounds (ESC / SPACE)"
           >
             <VolumeX className="w-3.5 h-3.5" />
             <span className="text-[9px] font-extrabold tracking-wider">STOP ALL</span>
@@ -55,7 +55,7 @@ export const NumpadPanel: React.FC = () => {
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
                 : 'bg-gradient-to-b from-[#2a2d36] to-[#17181f] text-gray-300 border-gray-700 shadow-beveled-btn hover:text-amber-300'
             }`}
-            title="Show Pad Info in OLED (I)"
+            title="Show Pad Info in OLED (TAB)"
           >
             <Info className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-[9px] font-extrabold tracking-wider">INFO</span>
@@ -69,7 +69,7 @@ export const NumpadPanel: React.FC = () => {
                 ? 'bg-orange-600/20 text-orange-400 border-orange-500/60 shadow-[0_0_8px_rgba(255,102,0,0.3)]'
                 : 'bg-gradient-to-b from-[#2a2d36] to-[#17181f] text-gray-300 border-gray-700 shadow-beveled-btn hover:text-orange-400'
             }`}
-            title="Toggle Gesture Camera (K)"
+            title="Toggle Gesture Camera"
           >
             <Camera className="w-3.5 h-3.5 text-orange-400" />
             <span className="text-[9px] font-extrabold tracking-wider">CAM</span>
@@ -89,7 +89,7 @@ export const NumpadPanel: React.FC = () => {
           </div>
         </div>
 
-        <div className="text-[9px] font-mono text-gray-500 hidden sm:block">
+        <div className="text-[9px] font-mono text-gray-500 hidden sm:block" title="16 pad keys: A S D F / G H J K / Z X C V / B N M L">
           A-F/G-K/Z-V/B-L
         </div>
       </div>

@@ -58,12 +58,8 @@ export async function deleteProjectFromDB(id: string): Promise<void> {
 }
 
 export async function saveSampleBlobToDB(id: string, name: string, type: string, data: ArrayBuffer): Promise<void> {
-  try {
-    const db = await getDB();
-    await db.put('samples', { id, name, type, data });
-  } catch (err) {
-    console.error('Failed to save sample blob to IndexedDB:', err);
-  }
+  const db = await getDB();
+  await db.put('samples', { id, name, type, data });
 }
 
 export async function loadSampleBlobFromDB(id: string): Promise<{ id: string; name: string; type: string; data: ArrayBuffer } | undefined> {
@@ -73,5 +69,32 @@ export async function loadSampleBlobFromDB(id: string): Promise<{ id: string; na
   } catch (err) {
     console.error('Failed to load sample blob from IndexedDB:', err);
     return undefined;
+  }
+}
+
+export type LastSession = { kind: 'kit'; id: string } | { kind: 'project'; id: string };
+
+const LAST_SESSION_KEY = 'mpc:last-session';
+
+/** Persist the last opened kit/project so a refresh restores the same session. */
+export function writeLastSession(session: LastSession): void {
+  try {
+    window.localStorage.setItem(LAST_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Storage may be unavailable (private mode); session restore is best-effort.
+  }
+}
+
+export function readLastSession(): LastSession | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LastSession;
+    if (parsed && (parsed.kind === 'kit' || parsed.kind === 'project') && typeof parsed.id === 'string') {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
   }
 }

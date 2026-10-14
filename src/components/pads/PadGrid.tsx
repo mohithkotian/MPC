@@ -20,6 +20,9 @@ export const PadGrid: React.FC = () => {
       // Ignore key repeats to prevent retriggering when key is held down
       if (e.repeat) return;
 
+      // Leave modifier combinations (Ctrl+Z, Cmd+Y, etc.) to their own handlers
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
       if (
         document.activeElement?.tagName === 'INPUT' ||
         document.activeElement?.tagName === 'TEXTAREA'

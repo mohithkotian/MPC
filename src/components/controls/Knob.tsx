@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 
 interface KnobProps {
   label: string;
   value: number;
   min?: number;
   max?: number;
+  step?: number;
   size?: 'sm' | 'md' | 'lg';
   onChange: (val: number) => void;
 }
@@ -14,36 +15,65 @@ export const Knob: React.FC<KnobProps> = ({
   value,
   min = 0,
   max = 1,
+  step,
   size = 'md',
   onChange,
 }) => {
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startVal = useRef(value);
+  const [isFocused, setIsFocused] = useState(false);
 
   const normalized = (value - min) / (max - min);
   const angle = -135 + normalized * 270;
+  const kbStep = step ?? (max - min) / 20;
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const clampAndEmit = (next: number) => {
+    onChange(Math.max(min, Math.min(max, next)));
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     isDragging.current = true;
     startY.current = e.clientY;
     startVal.current = value;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging.current) return;
     const deltaY = startY.current - e.clientY;
     const sensitivity = (max - min) / 150;
-    const newVal = Math.max(min, Math.min(max, startVal.current + deltaY * sensitivity));
-    onChange(newVal);
+    clampAndEmit(startVal.current + deltaY * sensitivity);
   };
 
-  const handleMouseUp = () => {
+  const handlePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
     isDragging.current = false;
-    document.removeEventListener('mousemove', handleMouseMove);
-    document.removeEventListener('mouseup', handleMouseUp);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      clampAndEmit(value + kbStep);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      clampAndEmit(value - kbStep);
+    } else if (e.key === 'PageUp') {
+      e.preventDefault();
+      clampAndEmit(value + kbStep * 4);
+    } else if (e.key === 'PageDown') {
+      e.preventDefault();
+      clampAndEmit(value - kbStep * 4);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      clampAndEmit(min);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      clampAndEmit(max);
+    }
   };
 
   const dimensionClass =
@@ -57,8 +87,21 @@ export const Knob: React.FC<KnobProps> = ({
         </span>
       )}
       <div
-        onMouseDown={handleMouseDown}
-        className={`relative ${dimensionClass} rounded-full bg-gradient-to-b from-[#2a2d36] via-[#1a1c22] to-[#0e0f13] shadow-knob-3d border border-[#363a46]/20 cursor-ns-resize flex items-center justify-center`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onKeyDown={handleKeyDown}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        role="slider"
+        tabIndex={0}
+        aria-label={label || 'knob'}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={Number(value.toFixed(2))}
+        className={`relative ${dimensionClass} rounded-full bg-gradient-to-b from-[#2a2d36] via-[#1a1c22] to-[#0e0f13] shadow-knob-3d border ${isFocused ? 'border-orange-400/70 shadow-[0_0_8px_rgba(255,102,0,0.35)]' : 'border-[#363a46]/20'} cursor-ns-resize flex items-center justify-center touch-none focus:outline-none`}
+        style={{ touchAction: 'none' }}
       >
         <div className="absolute inset-0.5 rounded-full border border-black/40 bg-gradient-to-tr from-[#12131a] to-[#1e2028]" />
 

@@ -39,8 +39,8 @@ export const TransportBar: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-between bg-gradient-to-b from-[#18191f] to-[#0e0f13] p-3 rounded-lg border border-[#1e2028] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.04),_0_4px_12px_rgba(0,0,0,0.4)] font-hardware">
-      <div className="flex items-center space-x-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-b from-[#18191f] to-[#0e0f13] p-3 rounded-lg border border-[#1e2028] shadow-[inset_1px_1px_2px_rgba(255,255,255,0.04),_0_4px_12px_rgba(0,0,0,0.4)] font-hardware">
+      <div className="flex items-center space-x-2 flex-wrap">
         <button
           onClick={toggleRecord}
           className={`relative px-4 py-2 rounded font-black text-xs uppercase flex items-center space-x-1.5 transition-all duration-150 border ${
@@ -90,7 +90,7 @@ export const TransportBar: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex items-center space-x-3">
+      <div className="flex items-center space-x-3 flex-wrap">
         <button
           onClick={toggleMetronome}
           className={`px-3 py-2 rounded text-xs font-bold uppercase border flex items-center space-x-1 transition-all duration-150 ${

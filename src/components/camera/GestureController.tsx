@@ -234,7 +234,7 @@ export const GestureController: React.FC = () => {
           onClick={toggleCamera}
           className="mt-3 px-3 py-1 bg-gradient-to-b from-[#262830] to-[#17181f] hover:bg-orange-600 hover:text-white border border-gray-700 hover:border-orange-400 text-[9px] font-extrabold text-gray-300 rounded shadow-beveled-btn transition-all"
         >
-          DISMISS [M]
+          DISMISS
         </button>
       </div>
     </div>

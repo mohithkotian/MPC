@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../../store/useStore';
 import { Knob } from '../controls/Knob';
+import { LevelMeter } from '../controls/LevelMeter';
 import { KEY_LABELS } from '../../services/audio/presetKits';
 import { Volume2 } from 'lucide-react';
 
@@ -16,12 +17,13 @@ export const MixerView: React.FC = () => {
             <Volume2 className="w-5 h-5 text-orange-500" />
             Pad Mixer - Bank {activeBank}
           </h2>
-          <p className="text-xs text-gray-500">Adjust volume, pan, pitch, and choke groups per pad.</p>
+          <p className="text-xs text-gray-500">Volume, pan, pitch, and choke groups per pad. Meters show the live output level.</p>
         </div>
         <div className="bg-[#0c0d11] px-4 py-2 rounded border border-[#1e2028] flex items-center space-x-3">
           <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">MASTER</span>
           <Knob label="" value={masterVolume} onChange={setMasterVolume} size="sm" />
           <span className="text-xs font-mono font-bold text-oled-red-bright">{Math.round(masterVolume * 100)}%</span>
+          <LevelMeter source="master" className="h-10" />
         </div>
       </div>
 
@@ -73,12 +75,7 @@ export const MixerView: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 h-32 bg-[#0a0b0e] p-1.5 rounded border border-[#1e2028]">
-              <div className="w-2 h-full bg-[#08080a] rounded overflow-hidden flex flex-col justify-end p-px border border-[#1e2028]">
-                <div
-                  className="w-full bg-gradient-to-t from-emerald-600 via-amber-500 to-red-500 rounded-sm transition-all duration-100"
-                  style={{ height: `${pad.volume * 100}%` }}
-                />
-              </div>
+              <LevelMeter source="pad" padKey={`${activeBank}-${idx}`} className="h-full" />
               <input
                 type="range"
                 min={0}

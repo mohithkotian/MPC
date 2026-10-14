@@ -14,24 +14,38 @@ export const KitBrowserModal: React.FC = () => {
     saveCurrentProject,
     loadProjectFromStorage,
     saveStatus,
-    lastSaveError,
   } = useStore();
 
-  const [savedProjects, setSavedProjects] = useState<ProjectData[]>([]);
+  const [savedProjects, setSavedProjects] = useState<Array<{ project: ProjectData; source: 'cloud' | 'local' }>>([]);
   const [newProjectName, setNewProjectName] = useState(projectName);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const fetchSavedProjects = async () => {
+    let cloudProjects: ProjectData[] | null = null;
     try {
-      setSavedProjects(await listCloudProjects());
+      cloudProjects = await listCloudProjects();
     } catch {
-      try {
-        setSavedProjects(await loadProjectsFromDB());
-        setStatusMessage('Cloud unavailable; showing local projects.');
-      } catch {
-        setSavedProjects([]);
-        setStatusMessage('Cloud and local projects are unavailable.');
+      cloudProjects = null;
+    }
+    let localProjects: ProjectData[] = [];
+    try {
+      localProjects = await loadProjectsFromDB();
+    } catch {
+      localProjects = [];
+    }
+    if (cloudProjects) {
+      const cloudIds = new Set(cloudProjects.map((project) => project.id));
+      const localOnly = localProjects.filter((project) => !cloudIds.has(project.id));
+      setSavedProjects([
+        ...cloudProjects.map((project) => ({ project, source: 'cloud' as const })),
+        ...localOnly.map((project) => ({ project, source: 'local' as const })),
+      ]);
+      if (localOnly.length > 0) {
+        setStatusMessage(null);
       }
+    } else {
+      setSavedProjects(localProjects.map((project) => ({ project, source: 'local' as const })));
+      setStatusMessage('Cloud unavailable; showing local projects.');
     }
   };
 
@@ -42,31 +56,34 @@ export const KitBrowserModal: React.FC = () => {
   const handleSave = async () => {
     if (!newProjectName.trim()) return;
     const outcome = await saveCurrentProject(newProjectName.trim());
+    const latestError = useStore.getState().lastSaveError;
     await fetchSavedProjects();
     setStatusMessage(
       outcome === 'cloud-success'
-        ? 'Project saved to cloud.'
+        ? 'Saved to cloud (sample audio is kept in this browser\'s local storage).'
         : outcome === 'local-only'
-          ? `Cloud unavailable; local safety save succeeded.${lastSaveError ? ` ${lastSaveError}` : ''}`
+          ? `Saved locally only — NOT synced to the cloud.${latestError ? ` ${latestError}` : ''}`
           : 'Cloud and local project saves failed.',
     );
-    setTimeout(() => setStatusMessage(null), 3000);
+    setTimeout(() => setStatusMessage(null), 4000);
   };
 
   const handleLoadPreset = async (kitId: string) => {
     setStatusMessage(`Loading ${kitId.toUpperCase()}...`);
     await loadPresetKit(kitId);
     setNewProjectName(PRESET_KITS[kitId].name);
-    setStatusMessage(`Loaded "${PRESET_KITS[kitId].name}"`);
-    setTimeout(() => setStatusMessage(null), 3000);
+    const warning = useStore.getState().kitLoadError;
+    setStatusMessage(warning ? `Loaded "${PRESET_KITS[kitId].name}" with warnings: ${warning}` : `Loaded "${PRESET_KITS[kitId].name}"`);
+    setTimeout(() => setStatusMessage(null), 5000);
   };
 
   const handleLoadUserProject = async (project: ProjectData) => {
     setStatusMessage(`Loading "${project.name}"...`);
     await loadProjectFromStorage(project);
     setNewProjectName(project.name);
-    setStatusMessage(`Loaded "${project.name}"`);
-    setTimeout(() => setStatusMessage(null), 3000);
+    const warning = useStore.getState().kitLoadError;
+    setStatusMessage(warning ? `Loaded "${project.name}" with warnings: ${warning}` : `Loaded "${project.name}"`);
+    setTimeout(() => setStatusMessage(null), 5000);
   };
 
   return (
@@ -80,8 +97,12 @@ export const KitBrowserModal: React.FC = () => {
           <p className="text-xs text-gray-500">Load kits or manage saved projects.</p>
         </div>
         {statusMessage && (
-          <div className="flex items-center space-x-1.5 bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 px-3 py-1.5 rounded text-xs font-bold animate-fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-bold animate-fade-in border max-w-md ${
+            /warning|failed|NOT synced|unavailable/i.test(statusMessage)
+              ? 'bg-amber-950/50 text-amber-300 border-amber-700/50'
+              : 'bg-emerald-950/50 text-emerald-300 border-emerald-800/50'
+          }`}>
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{statusMessage}</span>
           </div>
         )}
@@ -153,20 +174,32 @@ export const KitBrowserModal: React.FC = () => {
               <p className="text-xs text-gray-600 font-mono italic">No saved projects.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                {savedProjects.map((proj) => (
+                {savedProjects.map(({ project: proj, source }) => (
                   <div
                     key={proj.id}
                     className="flex items-center justify-between bg-[#0a0b0e] p-2.5 rounded border border-[#1e2028] hover:border-[#2a2d36] transition-colors"
                   >
-                    <div>
-                      <h5 className="text-xs font-extrabold text-white">{proj.name}</h5>
+                    <div className="min-w-0">
+                      <h5 className="text-xs font-extrabold text-white truncate flex items-center gap-1.5">
+                        <span className="truncate">{proj.name}</span>
+                        <span
+                          className={`shrink-0 text-[7px] font-black px-1 py-0.5 rounded border ${
+                            source === 'cloud'
+                              ? 'text-emerald-300 border-emerald-700/60 bg-emerald-950/40'
+                              : 'text-sky-300 border-sky-700/60 bg-sky-950/40'
+                          }`}
+                          title={source === 'cloud' ? 'Persisted in the cloud project store' : 'Stored only in this browser (local-only)'}
+                        >
+                          {source === 'cloud' ? 'CLOUD' : 'LOCAL'}
+                        </span>
+                      </h5>
                       <span className="text-[9px] font-mono text-gray-600">
                         {new Date(proj.updatedAt).toLocaleDateString()} // {proj.bpm} BPM
                       </span>
                     </div>
                     <button
                       onClick={() => handleLoadUserProject(proj)}
-                      className="px-3 py-1 rounded bg-[#1a1c22] hover:bg-orange-600 hover:text-white text-[10px] font-bold text-gray-400 border border-[#2a2d36] transition-all duration-150"
+                      className="px-3 py-1 rounded bg-[#1a1c22] hover:bg-orange-600 hover:text-white text-[10px] font-bold text-gray-400 border border-[#2a2d36] transition-all duration-150 shrink-0 ml-2"
                     >
                       LOAD
                     </button>
