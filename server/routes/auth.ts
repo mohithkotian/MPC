@@ -35,6 +35,18 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     res.status(401).json({ error: 'Unauthorized: Invalid or expired access token' });
   }
 }
+function providerErrorContext(error: unknown): { providerCode: string; providerMessage: string } {
+  const provider = typeof error === 'object' && error !== null
+    ? error as { code?: unknown; message?: unknown }
+    : {};
+  return {
+    providerCode: typeof provider.code === 'string' ? provider.code : 'unknown',
+    providerMessage: typeof provider.message === 'string'
+      ? provider.message
+      : error instanceof Error ? error.message : 'unknown provider error',
+  };
+}
+
 function currentUser(req: AuthenticatedRequest): User {
   if (!req.user) throw new Error('Verified user missing from request');
   return req.user;
@@ -81,7 +93,11 @@ meRouter.get('/organizations', async (req: AuthenticatedRequest, res: Response) 
     const { data, error } = await req.supabase!.from('organizations').select('id, name, slug, organization_members!inner(role)').order('name', { ascending: true });
     if (error) throw error;
     res.json({ organizations: data ?? [] });
-  } catch {
+  } catch (error) {
+    log('error', 'auth.organizations_query_failed', {
+      requestId: requestId(req),
+      ...providerErrorContext(error),
+    });
     res.status(502).json({ error: 'Unable to load organizations' });
   }
 });
