@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { OLEDDisplay } from '../oled/OLEDDisplay';
 import { PadBanks } from '../controls/PadBanks';
 import { Knob } from '../controls/Knob';
@@ -6,7 +6,8 @@ import { NumpadPanel } from '../controls/NumpadPanel';
 import { TransportBar } from '../controls/TransportBar';
 import { PadGrid } from '../pads/PadGrid';
 import { useStore } from '../../store/useStore';
-import { Camera, CameraOff } from 'lucide-react';
+import { Camera, CameraOff, Download } from 'lucide-react';
+import { renderProjectToWav } from '../../services/audio/wavExport';
 
 export const MainView: React.FC = () => {
   const {
@@ -18,7 +19,38 @@ export const MainView: React.FC = () => {
     setBpm,
     isCameraActive,
     toggleCamera,
+    projectId,
+    projectName,
+    projectArtist,
+    activeBank,
+    banks,
+    patterns,
+    swing,
+    kitLoadStatus,
+    kitLoadError,
   } = useStore();
+  const [exportState, setExportState] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle');
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportError, setExportError] = useState('');
+
+  const exportWav = async () => {
+    setExportState('rendering');
+    setExportProgress(0);
+    setExportError('');
+    try {
+      const blob = await renderProjectToWav({ id: projectId, name: projectName, artist: projectArtist, bpm, swing, masterVolume, activeBank, banks, patterns, createdAt: Date.now(), updatedAt: Date.now() }, (done, total) => setExportProgress(Math.round((done / total) * 100)));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${projectName || 'mpc-session'}.wav`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setExportState('done');
+    } catch (error) {
+      setExportState('error');
+      setExportError(error instanceof Error ? error.message : 'WAV export failed');
+    }
+  };
 
   return (
     <div className="flex flex-col lg:flex-row gap-5 items-start justify-center w-full max-w-6xl mx-auto select-none font-hardware animate-slide-in">
@@ -40,6 +72,11 @@ export const MainView: React.FC = () => {
             >
               {isCameraActive ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
             </button>
+            <button type="button" onClick={() => void exportWav()} disabled={exportState === 'rendering'} className="p-2 rounded-lg border border-[#1e2028] text-gray-400 hover:text-orange-400 disabled:opacity-50" title={exportState === 'rendering' ? `Rendering ${exportProgress}%` : 'Export WAV'}>
+              <Download className="w-4 h-4" />
+            </button>
+            {exportState === 'rendering' && <span className="text-[9px] font-mono text-orange-400">{exportProgress}%</span>}
+            {exportState === 'error' && <span className="max-w-32 truncate text-[9px] text-red-400" title={exportError}>EXPORT ERROR</span>}
           </div>
         </div>
 
@@ -53,6 +90,7 @@ export const MainView: React.FC = () => {
         </div>
 
         <TransportBar />
+        {kitLoadStatus !== 'idle' && kitLoadStatus !== 'ready' && <div className="text-center text-[10px] font-mono text-amber-400" role="status">KIT {kitLoadStatus.toUpperCase()}: {kitLoadError}</div>}
       </div>
 
       <div className="w-full lg:w-auto flex flex-col items-center space-y-1.5 bg-[#12131a] p-3 rounded-xl border border-[#1e2028]">

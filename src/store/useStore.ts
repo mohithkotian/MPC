@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { BankId, BankPattern, PadConfig, ProjectData, ViewMode } from '../types';
 import { audioEngine } from '../services/audio/AudioEngine';
 import { createEmptyBank, PRESET_KITS } from '../services/audio/presetKits';
-import { saveProjectToDB, saveSampleBlobToDB } from '../services/db/storage';
+import { saveProjectToDB, saveSampleBlobToDB, loadSampleBlobFromDB } from '../services/db/storage';
 import { saveCloudProject } from '../services/projects/projectApi';
+import { hasSoloPad, shouldPlayPad, getSwingDelayMs } from '../services/audio/padRouting';
+import { cloneMusicalSnapshot, createMusicalSnapshot, MusicalSnapshot } from '../services/projects/musicalHistory';
 
 export type ProjectSaveStatus = 'idle' | 'cloud-success' | 'local-only' | 'failed';
 
@@ -31,6 +33,10 @@ interface MPCState {
   lastSaveError: string | null;
   activePresetId: string;
   customKitNames: Record<string, string>;
+  kitLoadStatus: 'idle' | 'loading' | 'ready' | 'partial' | 'failed';
+  kitLoadError: string | null;
+  canUndo: boolean;
+  canRedo: boolean;
 
   banks: Record<BankId, PadConfig[]>;
   patterns: Record<BankId, BankPattern>;
@@ -52,6 +58,8 @@ interface MPCState {
 
   triggerPad: (bankPadIndex: number, velocity?: number) => void;
   updatePad: (bankId: BankId, bankPadIndex: number, updates: Partial<PadConfig>) => void;
+  togglePadMute: (bankId: BankId, bankPadIndex: number) => void;
+  togglePadSolo: (bankId: BankId, bankPadIndex: number) => void;
   renamePad: (bankId: BankId, bankPadIndex: number, name: string) => void;
   renameKit: (kitId: string, name: string) => void;
   assignSynthToPad: (bankId: BankId, bankPadIndex: number, synthType: any, name: string) => void;
@@ -60,6 +68,8 @@ interface MPCState {
   toggleStep: (bankPadIndex: number, stepIndex: number) => void;
   setStepVelocity: (bankPadIndex: number, stepIndex: number, velocity: number) => void;
   clearBankPattern: (bankId: BankId) => void;
+  undo: () => void;
+  redo: () => void;
 
   setBpm: (bpm: number) => void;
   setSwing: (swing: number) => void;
@@ -92,6 +102,32 @@ function createEmptyPattern(bankId: BankId): BankPattern {
 
 export const useStore = create<MPCState>((set, get) => {
   let stepTimerId: number | null = null;
+  const scheduledStepTimeouts = new Set<number>();
+  let kitLoadRequest = 0;
+  const undoStack: MusicalSnapshot[] = [];
+  const redoStack: MusicalSnapshot[] = [];
+  const rememberMusicalEdit = () => {
+    const state = get();
+    undoStack.push(createMusicalSnapshot(state.banks, state.patterns));
+    if (undoStack.length > 50) undoStack.shift();
+    redoStack.length = 0;
+    set({ canUndo: true, canRedo: false });
+  };
+  const restoreMusicalSnapshot = (snapshot: MusicalSnapshot) => {
+    const current = get();
+    const banks = {} as Record<BankId, PadConfig[]>;
+    for (const bank of ['A', 'B', 'C', 'D'] as BankId[]) {
+      banks[bank] = snapshot.banks[bank].map((pad) => {
+        const old = current.banks[bank].find((candidate) => candidate.id === pad.id);
+        const sameSample = old?.sampleId === pad.sampleId && old?.audioUrl === pad.audioUrl;
+        return { ...pad, audioBuffer: sameSample ? old?.audioBuffer ?? null : null };
+      });
+    }
+    const soloKeys = Object.values(banks).flat().filter((pad) => pad.isSolo && !pad.isMuted).map((pad) => `${pad.bank}-${pad.bankPadIndex}`);
+    for (const pad of Object.values(banks).flat()) audioEngine.setPadMuted(`${pad.bank}-${pad.bankPadIndex}`, Boolean(pad.isMuted));
+    audioEngine.setSoloPads(soloKeys);
+    set({ banks, patterns: snapshot.patterns, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 });
+  };
 
   const initialBanks: Record<BankId, PadConfig[]> = {
     A: createEmptyBank('A'),
@@ -130,6 +166,10 @@ export const useStore = create<MPCState>((set, get) => {
     saveStatus: 'idle',
     lastSaveError: null,
     activePresetId: 'kit1',
+    kitLoadStatus: 'idle',
+    kitLoadError: null,
+    canUndo: false,
+    canRedo: false,
     customKitNames: {
       kit1: 'FATHER',
       kit2: 'RUNAWAY',
@@ -202,6 +242,8 @@ export const useStore = create<MPCState>((set, get) => {
       const velModifier = (state.noteVariation / 100);
       const finalVel = (velocityOverride ?? 1.0) * velModifier;
       const padKey = `${state.activeBank}-${bankPadIndex}`;
+      if (hasSoloPad(state.banks[state.activeBank]) && !shouldPlayPad(pad, true)) return;
+      if (!shouldPlayPad(pad, false)) return;
 
       audioEngine.triggerPad(
         pad.audioBuffer || null,
@@ -244,6 +286,7 @@ export const useStore = create<MPCState>((set, get) => {
     },
 
     updatePad: (bankId, bankPadIndex, updates) => {
+      rememberMusicalEdit();
       set((state) => {
         const bankPads = [...state.banks[bankId]];
         bankPads[bankPadIndex] = { ...bankPads[bankPadIndex], ...updates };
@@ -251,6 +294,24 @@ export const useStore = create<MPCState>((set, get) => {
           banks: { ...state.banks, [bankId]: bankPads }
         };
       });
+    },
+
+    togglePadMute: (bankId, bankPadIndex) => {
+      const pad = get().banks[bankId][bankPadIndex];
+      if (!pad) return;
+      const muted = !pad.isMuted;
+      get().updatePad(bankId, bankPadIndex, { isMuted: muted });
+      audioEngine.setPadMuted(`${bankId}-${bankPadIndex}`, muted);
+    },
+
+    togglePadSolo: (bankId, bankPadIndex) => {
+      const state = get();
+      const pad = state.banks[bankId][bankPadIndex];
+      if (!pad) return;
+      const solo = !pad.isSolo;
+      get().updatePad(bankId, bankPadIndex, { isSolo: solo });
+      const soloKeys = Object.values(state.banks).flat().filter((candidate) => (candidate.bank === bankId && candidate.bankPadIndex === bankPadIndex ? solo : candidate.isSolo) && !candidate.isMuted).map((candidate) => `${candidate.bank}-${candidate.bankPadIndex}`);
+      audioEngine.setSoloPads(soloKeys);
     },
 
     assignSynthToPad: (bankId, bankPadIndex, synthType, name) => {
@@ -284,6 +345,7 @@ export const useStore = create<MPCState>((set, get) => {
     },
 
     toggleStep: (bankPadIndex, stepIndex) => {
+      rememberMusicalEdit();
       set((state) => {
         const bankPattern = state.patterns[state.activeBank];
         const updatedPads = bankPattern.pads.map((p) => {
@@ -308,6 +370,7 @@ export const useStore = create<MPCState>((set, get) => {
     },
 
     setStepVelocity: (bankPadIndex, stepIndex, velocity) => {
+      rememberMusicalEdit();
       set((state) => {
         const bankPattern = state.patterns[state.activeBank];
         const updatedPads = bankPattern.pads.map((p) => {
@@ -328,12 +391,29 @@ export const useStore = create<MPCState>((set, get) => {
     },
 
     clearBankPattern: (bankId) => {
+      rememberMusicalEdit();
       set((state) => ({
         patterns: {
           ...state.patterns,
           [bankId]: createEmptyPattern(bankId)
         }
       }));
+    },
+
+    undo: () => {
+      const previous = undoStack.pop();
+      if (!previous) return;
+      redoStack.push(createMusicalSnapshot(get().banks, get().patterns));
+      restoreMusicalSnapshot(cloneMusicalSnapshot(previous));
+      set({ canUndo: undoStack.length > 0, canRedo: true });
+    },
+
+    redo: () => {
+      const next = redoStack.pop();
+      if (!next) return;
+      undoStack.push(createMusicalSnapshot(get().banks, get().patterns));
+      restoreMusicalSnapshot(cloneMusicalSnapshot(next));
+      set({ canUndo: true, canRedo: redoStack.length > 0 });
     },
 
     togglePlay: () => {
@@ -354,6 +434,8 @@ export const useStore = create<MPCState>((set, get) => {
         clearInterval(stepTimerId);
         stepTimerId = null;
       }
+      for (const timeoutId of scheduledStepTimeouts) clearTimeout(timeoutId);
+      scheduledStepTimeouts.clear();
       set({ isPlaying: false, isRecording: false, isOverdubbing: false, currentStep: 0 });
     },
 
@@ -397,15 +479,18 @@ export const useStore = create<MPCState>((set, get) => {
         if (step && step.active) {
           const pad = state.banks[state.activeBank][padPattern.padId];
           if (pad) {
-            audioEngine.triggerPad(
-              pad.audioBuffer || null,
-              pad.synthParams,
-              pad.volume,
-              pad.pitch,
-              pad.pan,
-              pad.chokeGroup,
-              step.velocity
-            );
+            if (shouldPlayPad(pad, hasSoloPad(state.banks[state.activeBank]))) {
+              const play = () => audioEngine.triggerPad(pad.audioBuffer || null, pad.synthParams, pad.volume, pad.pitch, pad.pan, pad.chokeGroup, step.velocity, `${state.activeBank}-${padPattern.padId}`);
+              const delay = getSwingDelayMs(nextStep, state.bpm, state.swing);
+              if (delay > 0) {
+                const timeoutId = window.setTimeout(() => {
+                  scheduledStepTimeouts.delete(timeoutId);
+                  if (get().isPlaying) play();
+                }, delay);
+                scheduledStepTimeouts.add(timeoutId);
+              }
+              else play();
+            }
           }
         }
       });
@@ -414,6 +499,8 @@ export const useStore = create<MPCState>((set, get) => {
     loadPresetKit: async (kitId) => {
       const preset = PRESET_KITS[kitId];
       if (!preset) return;
+      const requestId = ++kitLoadRequest;
+      set({ kitLoadStatus: 'loading', kitLoadError: null });
 
       const newBanks: Record<BankId, PadConfig[]> = {
         A: createEmptyBank('A'),
@@ -422,6 +509,8 @@ export const useStore = create<MPCState>((set, get) => {
         D: createEmptyBank('D'),
       };
 
+      let requestedSamples = 0;
+      let loadedSamples = 0;
       for (const bKey of ['A', 'B', 'C', 'D'] as BankId[]) {
         const presetBankPads = preset.banks[bKey] || [];
         presetBankPads.forEach((pConfig) => {
@@ -435,9 +524,16 @@ export const useStore = create<MPCState>((set, get) => {
         for (const pad of newBanks[bKey]) {
           if (pad.audioUrl) {
             const buf = await audioEngine.loadAudioFromUrl(pad.audioUrl);
-            if (buf) pad.audioBuffer = buf;
+            requestedSamples += 1;
+            if (buf) {
+              loadedSamples += 1;
+              pad.audioBuffer = buf;
+            } else {
+              pad.synthParams = { type: 'none' };
+            }
           }
         }
+        if (requestId !== kitLoadRequest) return;
       }
 
       const demoPatterns = { ...initialPatterns };
@@ -460,6 +556,7 @@ export const useStore = create<MPCState>((set, get) => {
         demoPatterns.A.pads[8].steps[0].active = true;
       }
 
+      if (requestId !== kitLoadRequest) return;
       const kitDisplayName = get().customKitNames[preset.id] || preset.name;
       set({
         projectId: 'default-project',
@@ -469,7 +566,9 @@ export const useStore = create<MPCState>((set, get) => {
         activePresetId: preset.id,
         banks: newBanks,
         patterns: demoPatterns,
-        currentStep: 0
+        currentStep: 0,
+        kitLoadStatus: requestedSamples === 0 ? 'ready' : loadedSamples === requestedSamples ? 'ready' : loadedSamples === 0 ? 'failed' : 'partial',
+        kitLoadError: loadedSamples === requestedSamples ? null : `${requestedSamples - loadedSamples} original samples failed to load`
       });
     },
 
@@ -490,14 +589,18 @@ export const useStore = create<MPCState>((set, get) => {
         createdAt: now,
         updatedAt: now,
       };
+      const localProject: ProjectData = {
+        ...project,
+        banks: Object.fromEntries(Object.entries(project.banks).map(([bank, pads]) => [bank, pads.map(({ audioBuffer: _audioBuffer, ...pad }) => pad)])) as ProjectData['banks']
+      };
       try {
         const cloudProject = await saveCloudProject(project);
-        try { await saveProjectToDB(cloudProject); } catch { /* cloud is authoritative after success */ }
+        try { await saveProjectToDB({ ...cloudProject, banks: localProject.banks }); } catch { /* cloud is authoritative after success */ }
         set({ projectId: cloudProject.id, projectName: projName, saveStatus: 'cloud-success', lastSaveError: null });
         return 'cloud-success';
       } catch (cloudError) {
         try {
-          await saveProjectToDB(project);
+          await saveProjectToDB(localProject);
           const message = cloudError instanceof Error ? cloudError.message : 'Cloud project unavailable';
           set({ projectName: projName, saveStatus: 'local-only', lastSaveError: message });
           return 'local-only';
@@ -524,7 +627,13 @@ export const useStore = create<MPCState>((set, get) => {
 
       for (const bKey of ['A', 'B', 'C', 'D'] as BankId[]) {
         for (const pad of project.banks[bKey]) {
-          if (pad.audioUrl) {
+          if (pad.sampleId) {
+            const storedSample = await loadSampleBlobFromDB(pad.sampleId);
+            if (storedSample) {
+              pad.audioBuffer = await audioEngine.decodeArrayBuffer(storedSample.data);
+              audioEngine.registerBuffer(pad.sampleId, pad.audioBuffer);
+            }
+          } else if (pad.audioUrl) {
             const buf = await audioEngine.loadAudioFromUrl(pad.audioUrl);
             if (buf) pad.audioBuffer = buf;
           }
