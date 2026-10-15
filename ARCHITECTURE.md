@@ -15,7 +15,8 @@ This document separates what is verified in the checkout from the desired implem
 - `PadConfig` in `src/types/index.ts` includes sample identifiers/URLs, runtime `audioBuffer`, volume, pitch, pan, mute/solo, choke group, synth parameters, and optional sample boundaries. Runtime buffers are removed by project serialization.
 - `src/services/audio/AudioEngine.ts` lazily creates an `AudioContext`, master gain, analyser, buffer map, and active-voice/choke maps. It creates new source nodes per trigger, applies gain/velocity/pan/pitch, supports samples and synthesized voices, and tracks/stops active voices.
 - `src/services/audio/SecureAudioLoader.ts` obtains the current Supabase session, resolves an active organization, requests `/api/audio/stream/:sampleId` with Bearer and organization headers, retries once after a 401 refresh, and returns an `ArrayBuffer`.
-- `AudioEngine.loadAudioFromUrl()` decodes the response and caches it by URL. The cache is real but has no explicit concurrent-request deduplication, eviction policy, or separate cache abstraction; failed promises are not retained because the method returns `null` after failure.
+- `src/services/audio/AudioBufferCache.ts` is now the runtime-only cache primitive. It stores successful decoded values, shares one in-flight promise for a stable key, removes rejected loads so a later request can retry, and evicts oldest entries beyond its configured limit of 32.
+- `AudioEngine.loadAudioFromUrl()` now canonicalizes protected sample references to `sample:<sampleId>` keys and routes fetch/decode through `AudioBufferCache`. `registerBuffer()` uses the same sample-key namespace, so locally decoded uploads can be reused by later sample-ID loads. Failed loads still return `null` to preserve the current UI contract; they do not poison the cache.
 - `src/store/useStore.ts::triggerPad` resolves the selected bank/pad, applies mute/solo and velocity, then calls the audio engine immediately. Recording/overdub currently toggles the current 16-step cell when the transport is playing; it does not create a timestamped musical event.
 
 ### Current sequencer behavior
@@ -41,7 +42,7 @@ This document separates what is verified in the checkout from the desired implem
 
 ### Verified gaps and risks
 - The desired `Recorder`, musical event store, tick conversion, look-ahead scheduler, loop model, and tempo-map behavior are not present as dedicated verified components.
-- Sample cache keys are URL-oriented and loading is sequential during kit loading; concurrent duplicate fetches are not explicitly deduplicated.
+- Kit loading is still sequential and there is no browser-level authorized playback verification in this session. The cache now deduplicates concurrent loads once callers request the same stable sample key.
 - The current scheduler depends on JavaScript interval/timeout timing and therefore is vulnerable to UI/main-thread load and timer jitter.
 - `ProjectData` still contains a `customSamples` ArrayBuffer type even though serializers reject/omit runtime data; this boundary should remain under review.
 - Browser stress timing, deployed playback, live database state, migration application, and provider alert configuration were not verified in this session.
@@ -50,7 +51,7 @@ This document separates what is verified in the checkout from the desired implem
 
 Implement incrementally without replacing the verified auth, storage, Zustand, or AudioEngine foundations:
 
-1. **Sample Manager / AudioBuffer Cache** — stable sample-ID keys, concurrent promise deduplication, decoded-buffer reuse, failed-load cleanup, bounded memory policy, and explicit 401/403/404/429 handling.
+1. **Sample Manager / AudioBuffer Cache** — **implemented for the current loader path:** stable sample-ID keys, concurrent promise deduplication, decoded-buffer reuse, failed-load cleanup, and a 32-entry oldest-first bound. Explicit status-specific UI handling and browser memory tuning remain follow-up work.
 2. **Program/Pad Resolver** — resolve bank/program/pad metadata to a sample reference and playback parameters without coupling React views to runtime audio nodes.
 3. **Pad Input Router** — accept pad ID, velocity, and input time; route immediate playback and optionally pass the same interaction to recording.
 4. **Immediate Audio Engine** — retain the current Web Audio voice/choke/effects behavior, add scheduled start-time support and sample start/end handling where justified.

@@ -12,7 +12,7 @@ Status is based on the verified checkout at `main` / `d5ca340`. This roadmap ext
 **Acceptance criteria:** current and target architecture are separated; no planned component is described as implemented; tests and environment failures are recorded with exact outcomes.
 
 ## Phase 1 — Reliable sample loading and cache
-**Status: Pending**
+**Status: Complete for the implemented code/test slice; browser playback unverified**
 
 **Dependencies:** existing `SecureAudioLoader`, `AudioEngine`, protected audio route, and preset/catalog behavior.
 
@@ -23,9 +23,9 @@ Status is based on the verified checkout at `main` / `d5ca340`. This roadmap ext
 - Define a modest memory strategy appropriate to the app; never persist buffers or nodes.
 - Verify rapid repeated pad triggers reuse a decoded buffer and do not request the backend per hit.
 
-**Acceptance criteria:** focused unit tests cover cache hits, concurrent dedupe, failed-load retry, and missing sample behavior; an authorized sample can be loaded and reused by multiple pads in a browser-capable environment; unauthorized access remains rejected.
+**Acceptance criteria:** focused tests cover cache hits, concurrent dedupe, failed-load retry, and bounded eviction; TypeScript checks pass; existing AudioEngine integration tests pass; auth and storage portions of the existing suite remain green. Browser authorized playback and rapid-pad network observation were not run in this session.
 
-**Risks/decisions:** browser memory limits and whether cache eviction should be LRU or explicit kit lifecycle. Do not call this progressive streaming: Supabase storage currently downloads before the server returns its readable body.
+**Risks/decisions:** the current bound is oldest-first rather than measured LRU, and browser memory behavior is not measured. Status-specific UI messaging remains coarse. Do not call this progressive streaming: Supabase storage currently downloads before the server returns its readable body.
 
 ## Phase 2 — Pad resolver, input routing, and immediate playback
 **Status: Partially implemented**
@@ -88,4 +88,4 @@ Current cloud/local persistence stores metadata, banks, and fixed patterns in a 
 **Acceptance criteria:** typecheck, frontend/backend build, relevant unit/API/security tests, dependency audit, and security checks have recorded outcomes. Browser-only stress/deployed checks are explicitly marked run or not run. Production readiness remains blocked until repository release gates and external staging evidence are closed.
 
 ## Recommended next slice
-Start Phase 1, then Phase 2, as the smallest useful vertical slice: authenticated sample load → decoded cache reuse → pad resolver → immediate playback. Do not begin database normalization or export work before the event model is stable.
+Start Phase 2: extract the Program/Pad Resolver and Pad Input Router around the existing immediate `AudioEngine.triggerPad` path, while preserving the current UI and cache. Then add scheduled start-time support needed by the future look-ahead scheduler. Do not begin database normalization or export work before the event model is stable.
