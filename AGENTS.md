@@ -1,65 +1,75 @@
 # MPC Project Memory
 
-## Current Phase 2 auth state
-Supabase Auth is the identity authority. The browser uses `@supabase/supabase-js` for email/password signup/login, email verification, official session refresh, logout, password reset, and password update. Express verifies Bearer access tokens with `supabase.auth.getUser(accessToken)` and uses a request-scoped caller-token client. No custom JWT, refresh cookie, demo username login, or fabricated identity is permitted.
+## Read this first
+Before changing code, read `AGENTS.md`, `ARCHITECTURE.md`, `PLAN.md`, and `PROGRESS.md`. Inspect the current Git branch and working tree, then verify the actual implementation. Update `PROGRESS.md` at every meaningful checkpoint and update `ARCHITECTURE.md` or `PLAN.md` when behavior or sequencing changes.
 
-Profile bootstrap is idempotent through the authenticated application flow using verified `auth.uid()`. Migration `0002_auth_profile_bootstrap` adds only the self-insert RLS policy; it does not create a database trigger.
+## Verified product and stack
+MPC is a browser-based music production center. The verified stack is:
 
-## What this product does
-MPC is a browser-based music production center. Users trigger and sequence audio pads in React using the Web Audio API; the Node/Express backend authenticates sessions and streams protected sample assets.
+- Frontend: React 18, TypeScript, Vite 6, and Tailwind CSS.
+- State: Zustand in `src/store/useStore.ts`.
+- Audio: Web Audio API in `src/services/audio/AudioEngine.ts`; MediaPipe gesture input is present.
+- Authentication: Supabase Auth with browser-managed sessions and verified Bearer access tokens.
+- Backend: Node.js (repository engine range `>=22.0.0 <25.0.0`), Express 4, TypeScript, and `tsx`.
+- Storage: `SampleStorage` abstraction with local filesystem storage for development/tests and request-scoped Supabase Storage for organization samples.
+- Persistence: Express project routes backed by Supabase PostgreSQL migrations; browser projects also have local IndexedDB fallback code.
+- Deployment direction: native Render Static Site frontend plus native Render Node Web Service backend; no Docker/nginx dependency is part of the verified repository architecture.
 
-## Current stack (do not change without a reviewed ADR)
-- Frontend: React 18 + TypeScript + Vite + Tailwind CSS
-- Audio: Web Audio API + MediaPipe gesture input
-- Backend: Node.js 22.22.0 + Express 4 + TypeScript/tsx
-- Auth: Supabase Auth with browser-managed sessions and verified Bearer access tokens
-- Storage: `SampleStorage` abstraction with local filesystem for development/tests and private Supabase Storage for staging/production
-- Deployment: native Render Static Site frontend plus native Render Node Web Service backend; no Docker/nginx deployment dependency
-- CI: GitHub Actions Semgrep workflow only
+These are verified repository facts. A component name in a plan or diagram is not evidence that the component exists or is complete.
 
 ## Non-negotiable engineering rules
-- Never commit secrets, credentials, private URLs, proprietary samples, or generated build output.
-- Every authentication or authorization change must include negative tests; the server is the source of truth.
-- Never accept a username or identity from an unauthenticated request as proof of identity.
-- Never use fallback secrets in production. Required secrets must be validated at startup.
-- Every persistent schema change must use a reviewed migration; do not edit production data by hand.
-- Every audio access check must happen before file/object retrieval and must be tenant/resource scoped when multi-user features are introduced.
-- Do not log tokens, cookies, passwords, raw authorization headers, private sample paths, or unnecessary personal data.
-- Prefer a modular monolith and managed services until measured load requires another architecture.
-- Add one focused feature per branch/PR. Do not push directly to `main`.
-- Before calling work complete, run and show: `npm ci`, lint, typecheck, tests, build, dependency audit, and relevant security checks.
-- Before calling work complete, list changed files, skipped/stubbed behavior, assumptions, and remaining risks.
+1. Inspect real files before modifying code.
+2. Preserve unrelated user changes. Never use `git reset --hard`, `git clean -fd`, force-push, or other destructive Git operations.
+3. Do not overwrite valid documentation blindly; preserve project-specific facts.
+4. Classify claims as **verified implemented**, **partially implemented**, **broken**, **planned**, or **unknown**.
+5. Never invent files, endpoints, schema fields, migrations, test results, deployment state, or performance/security guarantees.
+6. Prefer the working modular-monolith architecture. Do not introduce another state manager, audio engine, auth system, database, or backend framework without a demonstrated need and reviewed decision.
+7. Keep changes focused and avoid broad refactors or unnecessary dependencies.
+8. Do not commit secrets, credentials, private URLs, proprietary samples, or build output.
+9. Never put Supabase service-role keys, private storage credentials, signing secrets, or other server-only secrets in frontend code or `VITE_*` variables.
+10. Authentication and authorization must remain server-enforced. Every auth/security change needs negative tests where the test infrastructure supports them.
+11. Check sample authorization before storage retrieval. Validate storage keys; never accept an arbitrary client-supplied path.
+12. Do not log tokens, cookies, passwords, raw authorization headers, private sample paths, or unnecessary personal data.
+13. Do not persist `AudioBuffer`, `AudioContext`, source nodes, decoded audio, or other runtime-only objects in project JSON.
+14. Do not use React renders, one timer per note, or `setTimeout` as the exact musical timing mechanism. JavaScript timers may wake a scheduler; the Web Audio clock must schedule playback.
+15. Do not claim real-time accuracy, stress-test results, production readiness, security completeness, audio export, or migration application without evidence.
+16. Do not stop at a plan when a safe implementation is possible; stop only for a genuine blocker or an explicit scope boundary.
 
-## Required commands (until tooling is upgraded)
-- Install: `npm ci`
-- Frontend build/typecheck: `npm run build`
-- Backend typecheck/build: `npm run build:server`
-- Backend dev: `npm run server`
-- Both dev servers: `npm run dev:all`
-- Dependency audit: `npm audit`
-- Security scan: Semgrep GitHub Actions workflow
+## Authentication and private-audio invariants
+- Supabase Auth is the identity authority. Use the official browser client for signup, login, verification, refresh, logout, password reset, and password update.
+- Express verifies Bearer tokens with Supabase user verification and attaches a request-scoped Supabase client.
+- No custom JWT, refresh cookie, demo username login, or fabricated identity is permitted.
+- Audio requests must retain auth, origin/referer checks, rate limiting/blocklist behavior, organization/resource authorization, safe storage-key resolution, and no-cache headers.
+- Browser-delivered audio can be captured after authorized decode. Describe this as authenticated/protected delivery, never as impossible to copy.
+- Keep decoded buffers in runtime cache only; persisted projects contain sample references and editable metadata.
 
-## Architecture direction
-Use a modular monolith first. Keep route handlers thin and move identity/session, authorization, sample catalog, storage, and rate-limit policies into dedicated modules. Production should use a real identity/session persistence strategy and durable object storage; local filesystem storage is only for local development or an explicitly single-instance deployment.
+## Repository commands
+From the repository root:
 
-## Working loop for every task
-1. Ask for or write the plan before editing.
-2. Work on a branch with a small, reviewable diff.
-3. Write a failing regression test for security/behavior bugs before fixing them.
-4. Implement only the approved slice.
-5. Run focused tests, then the full verification command set.
-6. Review the diff and inspect for secrets, debug endpoints, hard-coded deployment URLs, and accidental sample files.
-7. Record material decisions in `docs/decisions/` and update this file.
+```text
+npm ci
+npm run lint
+npm run build
+npm run build:server
+npm run test:auth
+npm run test:api
+npm run test:staging-smoke-auth
+npm audit
+```
 
-## Key project risks currently known
-See `docs/production-readiness-plan.md`. Do not describe the app as production-ready until the release-blocking findings and verification gates there are closed.
+`npm run lint` is currently `tsc --noEmit`. The package does not currently define a general unit-test script; use the focused scripts listed in `package.json`.
 
-## Phase 5.7 status
-The local Phase 5.7 implementation adds request-ID propagation, structured redacted request logs, bounded diagnostic counters, focused observability tests, a staging smoke-test entry point, and release/incident/backup/rollback runbooks. Phase 5.6 CI/staging/production workflows and ADRs 0006/0007 were recovered from retained local worktree history; the 26 tracked sample binaries were removed from the proposed working-tree diff without rewriting Git history. Provider alert configuration, staging end-to-end verification, an isolated database restore drill, a staging rollback rehearsal, and historical sample licensing/exposure review remain external gates and must be recorded as evidence before production readiness is claimed. See `docs/phase-5-7-readiness.md` and `docs/decisions/0008-phase-5-7-observability-and-operations.md`.
-The staging deployment handoff now accepts only successful same-repository push CI runs on `main` or `master`, downloads an exact-SHA smoke artifact, and never checks out workflow-run code. Production verification disables checkout credential persistence and keeps production secrets in the separate protected deploy job. See `docs/decisions/0012-trusted-deployment-workflow.md`.
+## Working loop
+1. Inspect status, branch, relevant docs, package scripts, and implementation.
+2. Write or update the smallest focused plan/checkpoint.
+3. Add a focused regression test before fixing a security or behavior bug when practical.
+4. Implement one coherent slice.
+5. Run focused checks, then the full feasible verification set.
+6. Inspect the diff for secrets, debug routes, hard-coded deployment URLs, and accidental sample files.
+7. Update `ARCHITECTURE.md`, `PLAN.md`, and `PROGRESS.md` with verified outcomes.
+8. List changed files, skipped/stubbed behavior, assumptions, and remaining risks.
 
-## Render cloud project API origin status
-Cloud project list/create/load/update/delete requests must use the normalized `VITE_API_BASE`; Render's Static Site and backend are separate origins. The staging build must set `VITE_API_BASE=https://mpc-staging-backend.onrender.com`. Preserve Bearer auth, organization context, typed cloud errors, and local fallback; do not claim persistence is fixed before verifying list and save against deployed staging. See `docs/decisions/0014-render-cloud-project-api-origin.md`.
+## Current known baseline
+The current UI and secure sample/project foundations exist, but the sequencer is not yet the target real-time event scheduler. `src/store/useStore.ts` advances a 16-step pattern using `window.setInterval` and swing `setTimeout` callbacks. There is no verified general musical event store, look-ahead scheduler, tempo map, loop-iteration model, or dedicated PadInputRouter/AudioBufferCache module. Do not describe those as complete.
 
-## Phase 5.8 private FATHER/RUNAWAY sample packs
-The staging pack objects remain private under `organizations/<organization-uuid>/samples/father/*.mp3` and `.../runaway/*.mp3`. Staging migration `0004_private_organization_sample_storage_read` and its MPC migration-ledger entry are applied; 26 ready FATHER/RUNAWAY catalog rows were inserted after checking exact objects and mappings. The bucket remains private; the policy is read-only and membership-scoped. Staging/production aliases resolve only through the authenticated catalog; validate the key’s organization and kit folder against active membership and the alias before retrieving through the request-scoped Storage client. The mapping follows `server/scripts/prepareSamples.ts`; database pad indices are zero-based. The unrelated UUID-named upload is not assigned. The code fix is still on a feature branch, not deployed. Do not claim playback fixed until an authorized audio request returns HTTP 200 and playback is heard in the deployed browser. See `docs/decisions/0015-private-organization-sample-packs.md`.
+See `docs/production-readiness-plan.md` and `docs/phase-5-7-readiness.md` for additional release gates. Do not call the application production-ready while those gates remain open.
