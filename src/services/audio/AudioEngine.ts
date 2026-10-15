@@ -1,11 +1,12 @@
 import { SynthParams, SynthType } from '../../types';
 import { secureAudioLoader } from './SecureAudioLoader';
+import { AudioBufferCache } from './AudioBufferCache';
 
 class AudioEngineService {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private analyser: AnalyserNode | null = null;
-  private bufferCache: Map<string, AudioBuffer> = new Map();
+  private bufferCache = new AudioBufferCache<AudioBuffer>(32);
   private activeChokeNodes: Map<number, { source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }[]> = new Map();
   private activePadVoices: Map<string, { source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }[]> = new Map();
   private allActiveVoices: Set<{ source: AudioBufferSourceNode | OscillatorNode; gain: GainNode }> = new Set();
@@ -51,28 +52,31 @@ class AudioEngineService {
   }
 
   public async loadAudioFromUrl(url: string): Promise<AudioBuffer | null> {
-    if (this.bufferCache.has(url)) {
-      return this.bufferCache.get(url)!;
+    const protectedSample = url.startsWith('sample:') || url.startsWith('/api/audio/') || url.includes('-pad');
+    const rawSampleId = protectedSample
+      ? url.replace(/^sample:/, '').replace(/^\/api\/audio\/stream\//, '')
+      : null;
+    let sampleId = rawSampleId;
+    if (sampleId) {
+      try { sampleId = decodeURIComponent(sampleId); } catch { /* keep the raw ID for the loader to reject */ }
     }
+    const cacheKey = sampleId ? `sample:${sampleId}` : `url:${url}`;
     try {
-      let arrayBuffer: ArrayBuffer;
+      return await this.bufferCache.load(cacheKey, async () => {
+        let arrayBuffer: ArrayBuffer;
+        if (sampleId) {
+          arrayBuffer = await secureAudioLoader.fetchAndDecryptSample(sampleId);
+        } else {
+          const response = await fetch(url, { headers: { 'Cache-Control': 'no-store' } });
+          if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+          arrayBuffer = await response.arrayBuffer();
+        }
 
-      // Check if URL is an obfuscated secure sample ID or endpoint
-      if (url.startsWith('sample:') || url.startsWith('/api/audio/') || url.includes('-pad')) {
-        const sampleId = url.replace(/^sample:/, '');
-        arrayBuffer = await secureAudioLoader.fetchAndDecryptSample(sampleId);
-      } else {
-        const response = await fetch(url, { headers: { 'Cache-Control': 'no-store' } });
-        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-        arrayBuffer = await response.arrayBuffer();
-      }
-
-      const ctx = this.getContext();
-      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-      this.bufferCache.set(url, decodedBuffer);
-      return decodedBuffer;
+        const ctx = this.getContext();
+        return ctx.decodeAudioData(arrayBuffer);
+      });
     } catch (err) {
-      console.warn('Failed to load audio securely', { url, err });
+      console.warn('Failed to load audio securely', { sample: sampleId ?? 'remote-audio', err });
       return null;
     }
   }
@@ -83,7 +87,7 @@ class AudioEngineService {
   }
 
   public registerBuffer(id: string, buffer: AudioBuffer) {
-    this.bufferCache.set(id, buffer);
+    this.bufferCache.set(`sample:${id.replace(/^sample:/, '')}`, buffer);
   }
 
   public triggerPad(

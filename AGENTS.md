@@ -70,6 +70,6 @@ npm audit
 8. List changed files, skipped/stubbed behavior, assumptions, and remaining risks.
 
 ## Current known baseline
-The current UI and secure sample/project foundations exist, but the sequencer is not yet the target real-time event scheduler. `src/store/useStore.ts` advances a 16-step pattern using `window.setInterval` and swing `setTimeout` callbacks. There is no verified general musical event store, look-ahead scheduler, tempo map, loop-iteration model, or dedicated PadInputRouter/AudioBufferCache module. Do not describe those as complete.
+Phase 1 now includes `src/services/audio/AudioBufferCache.ts`, a runtime-only bounded cache that deduplicates concurrent loads and removes failed loads for retry. `AudioEngine.loadAudioFromUrl()` uses stable sample keys and the cache; the focused cache tests and TypeScript checks pass. Browser authorized-playback verification is still not complete. The sequencer is not yet the target real-time event scheduler: `src/store/useStore.ts` advances a 16-step pattern using `window.setInterval` and swing `setTimeout` callbacks. There is no verified general musical event store, look-ahead scheduler, tempo map, or loop-iteration model. Do not describe those as complete.
 
 See `docs/production-readiness-plan.md` and `docs/phase-5-7-readiness.md` for additional release gates. Do not call the application production-ready while those gates remain open.
